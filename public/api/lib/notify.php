@@ -62,12 +62,10 @@ function avisar_consumo_si_corresponde(array $cli, int $usado, int $contr): void
   $cliId   = (int)$cli['id'];
   $periodo = date('Y-m');
 
-  if ($pct < 75) {   // por debajo del umbral: limpiar flags -> permite re-avisar al volver a subir
+  // Por debajo del 75% = han ampliado el plan -> resetear AMBOS avisos (75 y 100) para volver a enviarlos al cruzar.
+  if ($pct < 75) {
     db()->prepare('DELETE FROM avisos_email WHERE cliente_id = ? AND periodo = ?')->execute([$cliId, $periodo]);
     return;
-  }
-  if ($pct < 100) {  // entre 75 y 100: resetea el flag de 100 (por si bajó desde 100 tras recargar)
-    db()->prepare('DELETE FROM avisos_email WHERE cliente_id = ? AND periodo = ? AND nivel = 100')->execute([$cliId, $periodo]);
   }
   $nivel = $pct >= 100 ? 100 : 75;
 
