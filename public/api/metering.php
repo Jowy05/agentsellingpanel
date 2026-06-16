@@ -88,53 +88,29 @@ foreach ($clientes as $cli) {
     }
     audit($auth['id'], $quick ? 'metering_rapido' : 'metering', 'Cliente #' . $cli['id'] . ': ' . $total . ' min (' . count($agentes) . ' agentes)');
 
-    // Auto-corte / auto-reactivación según el umbral del 100%:
-    //  - total >= contratado  → cortar cada agente con DID (desviar a su IVR de corte / el del cliente)
-    //  - total <  contratado  → restaurar cada agente cortado (volver al destino guardado)
-    $cortados = []; $restaurados = [];
+    // AUTO-CORTE al 100% (la reactivación es MANUAL en la GUI; la API no puede devolver el DID al agente IA):
+    // si total >= contratado, desvía cada agente NO cortado a su IVR de corte (su ivr_corte o el del cliente).
+    $cortados = [];
     $contr = (int)($cli['minutos_contratados'] ?? 0);
-    if ($autoCut && $contr > 0) {
-        $sobrepasa = ($total >= $contr);
+    if ($autoCut && $contr > 0 && $total >= $contr) {
         foreach ($agentes as $a) {
+            if (($a['estado_desvio'] ?? 'normal') === 'cortado') continue;
             $did = trim((string)($a['ddi'] ?? ''));
             if ($did === '') continue;   // sin DID público no se puede desviar por API
-            $estado = (string)($a['estado_desvio'] ?? 'normal');
-
-            if ($sobrepasa && $estado !== 'cortado') {
-                $dest = trim((string)($a['ivr_corte'] ?? ''));
-                if ($dest === '') $dest = trim((string)($cli['desvio_100'] ?? ''));
-                if ($dest === '') continue;
-                $antes = leer_destino_actual($server, $did);   // guarda el destino real (el agente) para poder restaurar
-                if ($antes !== null && pbx_es_uuid($antes)) {  // destino = agente IA: no restaurable vía API → no cortar
-                    audit($auth['id'], 'auto_corte_bloqueado', 'agente#' . $a['id'] . ' did=' . $did . ' dest_actual=UUID');
-                    continue;
-                }
-                if ($antes !== null && $antes !== '' && $antes !== $dest) {
-                    db()->prepare('UPDATE agentes SET did_dest_backup = ?, actualizado = NOW() WHERE id = ?')->execute([$antes, (int)$a['id']]);
-                }
-                $rr = pbx_call('did', 'edit', construir_params_did_edit($did, $dest), $server);
-                if (!empty($rr['ok'])) {
-                    db()->prepare("UPDATE agentes SET estado_desvio = 'cortado', actualizado = NOW() WHERE id = ?")->execute([(int)$a['id']]);
-                    audit($auth['id'], 'auto_corte', 'agente#' . $a['id'] . ' did=' . $did . ' dest=' . $dest);
-                    $cortados[] = $a['nombre'];
-                } else {
-                    audit($auth['id'], 'auto_corte_error', 'agente#' . $a['id'] . ' did=' . $did);
-                }
-            } elseif (!$sobrepasa && $estado === 'cortado') {
-                $back = trim((string)($a['did_dest_backup'] ?? ''));
-                if ($back === '') continue;   // no se sabe a qué restaurar
-                $rr = pbx_call('did', 'edit', construir_params_did_edit($did, $back), $server);
-                if (!empty($rr['ok'])) {
-                    db()->prepare("UPDATE agentes SET estado_desvio = 'normal', did_dest_backup = NULL, actualizado = NOW() WHERE id = ?")->execute([(int)$a['id']]);
-                    audit($auth['id'], 'auto_reactivar', 'agente#' . $a['id'] . ' did=' . $did . ' dest=' . $back);
-                    $restaurados[] = $a['nombre'];
-                } else {
-                    audit($auth['id'], 'auto_reactivar_error', 'agente#' . $a['id'] . ' did=' . $did);
-                }
+            $dest = trim((string)($a['ivr_corte'] ?? ''));
+            if ($dest === '') $dest = trim((string)($cli['desvio_100'] ?? ''));
+            if ($dest === '' || !ctype_digit($dest)) continue;   // el IVR de corte debe ser un nº de IVR
+            $cut = pbx_cortar_did($server, $did, $dest, 3);       // dest_type 3 = IVR
+            if (!empty($cut['ok'])) {
+                db()->prepare("UPDATE agentes SET estado_desvio = 'cortado', actualizado = NOW() WHERE id = ?")->execute([(int)$a['id']]);
+                audit($auth['id'], 'auto_corte', 'agente#' . $a['id'] . ' did=' . $did . ' -> IVR ' . $dest);
+                $cortados[] = $a['nombre'];
+            } else {
+                audit($auth['id'], 'auto_corte_error', 'agente#' . $a['id'] . ' did=' . $did . ' ' . json_encode($cut['raw'] ?? $cut['error'] ?? null, JSON_UNESCAPED_UNICODE));
             }
         }
     }
-    $resumen[] = ['cliente' => $cli['nombre'], 'minutos_total' => $total, 'contratado' => $contr, 'agentes' => $detalle, 'cortados' => $cortados, 'restaurados' => $restaurados];
+    $resumen[] = ['cliente' => $cli['nombre'], 'minutos_total' => $total, 'contratado' => $contr, 'agentes' => $detalle, 'cortados' => $cortados];
 }
 
 json_out(['ok' => true, 'periodo' => $periodo, 'resumen' => $resumen]);

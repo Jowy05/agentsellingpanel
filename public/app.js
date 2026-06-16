@@ -146,7 +146,7 @@
     var ok=await reloadClients(); if(ok===false){ stopAuto(); return; }
     updateAlerts();
     var sig=clientsSig();
-    if(sig!==lastSig){ lastSig=sig; if(!modalOpen() && refreshableView()) renderView(); }
+    if(sig!==lastSig){ lastSig=sig; if(!modalOpen() && refreshableView()) renderView(true); }   // true = sin animación (no parpadea)
   }
   async function autoMeter(scope){
     if(document.hidden || AUTO.metering || !isAdmin()) return;   // solo admin; sin solapar (rápida vs completa comparten cerrojo)
@@ -154,8 +154,10 @@
     try{
       var r=await api('metering.php', scope==='today'?{scope:'today'}:{});
       if(r.status===401){ stopAuto(); renderLogin(); return; }
-      await reloadClients(); updateAlerts(); lastSig=clientsSig();
-      if(!modalOpen() && refreshableView()) renderView();
+      var ok=await reloadClients(); if(ok===false){ stopAuto(); return; }
+      updateAlerts();
+      var sig=clientsSig();
+      if(sig!==lastSig){ lastSig=sig; if(!modalOpen() && refreshableView()) renderView(true); }   // solo redibuja si cambió algo
     } finally { AUTO.metering=false; }
   }
   function startAuto(){
@@ -237,13 +239,14 @@
     setTimeout(function(){ document.addEventListener('click', function onDoc(e){ if (!wrap.contains(e.target)){ dd.remove(); document.removeEventListener('click', onDoc); } }); }, 0);
   }
 
-  function renderView(){
+  function renderView(quiet){
     app.querySelectorAll('.seg').forEach(function(b){ b.classList.toggle('active', b.dataset.v===S.view); });
     var v=document.getElementById('view');
     if (S.view==='clientes'){ v.innerHTML=viewClientes(); bindClientes(); }
     else if (S.view==='stats'){ v.innerHTML=viewStats(); bindStats(); bindDatos(); }
     else if (S.view==='mail'){ v.innerHTML=viewMail(); bindMail(); }
     else if (S.view==='equipo'){ viewEquipo(v); }
+    if (quiet) v.querySelectorAll('.view-enter').forEach(function(e){ e.classList.remove('view-enter'); });  // refresco automático: sin animación de entrada
     updateAlerts();
   }
 
@@ -343,7 +346,12 @@
     var ags=(r.data&&r.data.agentes)||[];
     var rows = ags.length ? ags.map(function(a){
       var cut = a.estado_desvio==='cortado';
-      var divBtn = (admin && a.ddi) ? '<button class="btn btn-ghost btn-sm" data-guide="'+a.id+'" title="Cómo cortar/reactivar en la centralita">🔌 Corte manual</button>' : '';
+      var divBtn='';
+      if(admin && a.ddi){
+        divBtn = cut
+          ? '<button class="btn btn-ghost btn-sm" data-guide="'+a.id+'" title="Cómo reactivar en la centralita">Cómo reactivar</button><button class="btn btn-primary btn-sm" data-react="'+a.id+'" title="Lo he reactivado en la centralita">✅ Marcar reactivado</button>'
+          : '<button class="btn btn-ghost btn-sm" data-cut="'+a.id+'" title="Cortar ahora (desviar al IVR de corte)">Cortar ahora</button>';
+      }
       return '<div class="agent-row"><div class="agent-meta"><div>'+
         '<div class="agent-name">'+esc(a.nombre)+(cut?' <span class="cut-tag"><span class="sd"></span>Cortado</span>':'')+'</div>'+
         '<div class="agent-sub">DDI '+esc(a.ddi||'—')+(a.dial_number?' · dial '+esc(a.dial_number):'')+' · corte: '+esc(a.ivr_corte||'(por defecto)')+'</div></div></div>'+
@@ -362,33 +370,45 @@
     box.querySelectorAll('[data-guide]').forEach(function(b){ b.addEventListener('click', function(){
       var ag=ags.filter(function(x){ return String(x.id)===b.dataset.guide; })[0]; if(ag) openCorteGuide(ag, c);
     });});
+    box.querySelectorAll('[data-cut]').forEach(function(b){ b.addEventListener('click', function(){ doCut(+b.dataset.cut, c); }); });
+    box.querySelectorAll('[data-react]').forEach(function(b){ b.addEventListener('click', function(){
+      var ag=ags.filter(function(x){ return String(x.id)===b.dataset.react; })[0]; doReactivado(+b.dataset.react, c, ag);
+    });});
     box.querySelectorAll('[data-delag]').forEach(function(b){ b.addEventListener('click', async function(){
       if(!confirm('¿Quitar este agente?')) return;
       var rr=await api('agents.php',{action:'delete',id:+b.dataset.delag});
       if(rr.data&&rr.data.ok){ toast('Agente quitado'); loadFichaAgents(c); } else toast(emsg(rr.data));
     });});
   }
-  // Guía paso a paso para cortar/reactivar el agente A MANO en la centralita (el corte por API aún no es posible).
+  async function doCut(agentId, c){
+    if(!confirm('Esto desviará el agente al IVR de corte en la CENTRALITA REAL. ¿Continuar?')) return;
+    var r=await api('divert.php',{agent_id:agentId, action:'cut'});
+    if(r.data&&r.data.ok){ toast('Agente cortado (desviado al IVR '+(r.data.destino||'')+')'); loadFichaAgents(c); }
+    else toast('PBX: '+emsg(r.data));
+  }
+  async function doReactivado(agentId, c, ag){
+    var nom = (ag&&ag.nombre)?ag.nombre:'el agente';
+    if(!confirm('¿Ya has reactivado «'+nom+'» en la centralita (Destination → AI Voice Agents)?\n\nPulsa Aceptar SOLO si ya lo has hecho en la GUI; esto lo marca como activo en el panel.\nSi aún no, pulsa Cancelar y te abro la guía.')){ if(ag) openCorteGuide(ag,c); return; }
+    var r=await api('divert.php',{agent_id:agentId, action:'reactivado'});
+    if(r.data&&r.data.ok){ toast('Marcado como reactivado'); loadFichaAgents(c); }
+    else toast(emsg(r.data));
+  }
+  // Guía: el corte es AUTOMÁTICO al 100%; la REACTIVACIÓN se hace a mano en la GUI (la API no puede devolver el DID al agente IA).
   function openCorteGuide(a, c){
     var corte = a.ivr_corte || c.desvio_100 || '(configura un IVR de corte)';
     var did = esc(a.ddi||'—');
     var html='<div class="modal-scrim" id="scrimg"><div class="modal" style="max-width:560px"><div class="modal-head"><div>'+
-      '<h3 class="mh-name">Cortar / reactivar en la centralita</h3>'+
+      '<h3 class="mh-name">Reactivar el agente en la centralita</h3>'+
       '<div class="mh-meta">'+esc(a.nombre)+' · DID '+did+'</div></div>'+
       '<button class="x-close" id="xg">✕</button></div><div class="modal-body">'+
-      '<p class="muted" style="margin:0 0 16px">El corte por API todavía no está disponible (Bicom no lo expone). Hazlo a mano en PBXware — son 3 clics:</p>'+
-      '<div style="margin:0 0 16px"><div style="font-weight:700;margin-bottom:6px;color:var(--c-danger)">① Cortar (cliente al 100%)</div>'+
+      '<p class="muted" style="margin:0 0 16px">El <b>corte al 100% es automático</b> (el panel desvía el DID al IVR de corte <code>'+esc(corte)+'</code>). La <b>reactivación es manual</b>: cuando el cliente amplíe minutos, devuélvelo al agente en PBXware — 3 clics:</p>'+
+      '<div style="margin:0 0 8px"><div style="font-weight:700;margin-bottom:6px;color:var(--c-ok)">Reactivar</div>'+
       '<ol style="margin:0;padding-left:20px;line-height:1.9">'+
-        '<li>Entra en PBXware (GUI del tenant).</li>'+
-        '<li>Menú <b>DIDs</b> → abre el DID <code>'+did+'</code>.</li>'+
-        '<li>En <b>Destination</b> elige el IVR de corte: <code>'+esc(corte)+'</code>.</li>'+
-        '<li>Pulsa <b>Guardar</b>.</li></ol></div>'+
-      '<div style="margin:0 0 8px"><div style="font-weight:700;margin-bottom:6px;color:var(--c-ok)">② Reactivar (cuando amplíe minutos)</div>'+
-      '<ol style="margin:0;padding-left:20px;line-height:1.9">'+
-        '<li>Abre de nuevo el DID <code>'+did+'</code>.</li>'+
+        '<li>Entra en PBXware → menú <b>DIDs</b> → abre el DID <code>'+did+'</code>.</li>'+
         '<li>En <b>Destination</b> elige <b>«AI Voice Agents»</b> → Value = <code>'+esc(a.nombre)+'</code>.</li>'+
-        '<li>Pulsa <b>Guardar</b>.</li></ol></div>'+
-      '<p class="muted" style="margin:14px 0 0">Truco: antes de cortar, comprueba que el destino actual es el agente, por si acaso.</p>'+
+        '<li>Pulsa <b>Guardar</b>.</li>'+
+        '<li>Vuelve al panel y pulsa <b>«✅ Marcar reactivado»</b>.</li></ol></div>'+
+      '<p class="muted" style="margin:14px 0 0">El corte también puedes forzarlo a mano con <b>«Cortar ahora»</b> (desvía al IVR <code>'+esc(corte)+'</code>).</p>'+
       '</div></div></div>';
     var wrap=document.createElement('div'); wrap.innerHTML=html; document.body.appendChild(wrap.firstChild);
     var scrim=document.getElementById('scrimg');
