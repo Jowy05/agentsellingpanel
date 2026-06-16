@@ -78,3 +78,14 @@ CREATE TABLE IF NOT EXISTS auditoria (
   ip         TEXT,
   cuando     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Avisos de consumo ya enviados (una sola vez por cliente/periodo/nivel: 75 o 100).
+CREATE TABLE IF NOT EXISTS avisos_email (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  cliente_id INTEGER NOT NULL,
+  periodo    TEXT NOT NULL,
+  nivel      INTEGER NOT NULL,
+  enviado    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (cliente_id, periodo, nivel),
+  FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
+);

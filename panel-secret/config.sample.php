@@ -20,8 +20,11 @@ return [
     'session_name'   => 'cxpanel',
     'totp_issuer'    => 'Conexia Panel',
     'cdr_date_fmt'   => 'M-d-Y',                       // PHP date() -> "Jun-01-2026"
+    'auto_cut_100'   => false,                         // true = corta el agente automáticamente al 100% (did.edit a IVR)
   ],
   'n8n' => [
-    'webhook' => '',                                   // URL del webhook de avisos (a rellenar)
+    'webhook' => '',                                   // URL del webhook de avisos (workflow PANEL-AGENTE-IA-MAIL)
+    'token'   => '',                                   // valor de la cabecera x-panel-token que protege el webhook
+    'cc'      => '',                                   // copia del aviso (pruebas: jowy; prod: SAC)
   ],
 ];

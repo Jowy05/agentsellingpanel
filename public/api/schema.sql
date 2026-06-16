@@ -78,3 +78,14 @@ CREATE TABLE IF NOT EXISTS auditoria (
   ip         VARCHAR(64),
   cuando     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Avisos de consumo ya enviados (una sola vez por cliente/periodo/nivel: 75 o 100).
+CREATE TABLE IF NOT EXISTS avisos_email (
+  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  cliente_id INT UNSIGNED NOT NULL,
+  periodo    VARCHAR(7) NOT NULL,
+  nivel      TINYINT UNSIGNED NOT NULL,
+  enviado    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_aviso (cliente_id, periodo, nivel),
+  FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -3,6 +3,7 @@
 // El total del cliente = suma de los minutos de sus agentes (vía clients.php list).
 require __DIR__ . '/_bootstrap.php';
 require __DIR__ . '/lib/pbx.php';
+require __DIR__ . '/lib/notify.php';
 
 set_exception_handler(function (Throwable $e): void {
     error_log('metering.php: ' . $e->getMessage());
@@ -20,7 +21,7 @@ $hoy     = date('M-d-Y');                               // hoy
 $ayer    = date('M-d-Y', strtotime('-1 day'));         // ayer
 $quick   = (($in['scope'] ?? '') === 'today');         // medición RÁPIDA: solo recalcula hoy (1 consulta/agente)
 
-$stc = db()->prepare('SELECT id, nombre, tenant, minutos_contratados, desvio_100 FROM clientes' . ($clientId ? ' WHERE id = ?' : ''));
+$stc = db()->prepare('SELECT id, nombre, correo, tenant, minutos_contratados, desvio_100 FROM clientes' . ($clientId ? ' WHERE id = ?' : ''));
 $stc->execute($clientId ? [$clientId] : []);
 $clientes = $stc->fetchAll();
 
@@ -110,6 +111,9 @@ foreach ($clientes as $cli) {
             }
         }
     }
+    // Aviso por email al 75% / 100% (una sola vez por cliente/periodo/nivel).
+    avisar_consumo_si_corresponde($cli, $total, $contr);
+
     $resumen[] = ['cliente' => $cli['nombre'], 'minutos_total' => $total, 'contratado' => $contr, 'agentes' => $detalle, 'cortados' => $cortados];
 }
 
