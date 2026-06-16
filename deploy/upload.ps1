@@ -1,7 +1,7 @@
 # =====================================================================
-#  SUBIDA AISLADA — Panel de minutos (cPanel de Conexia)
-#  Sube panel-secret/config.php  -> /home/conexiatec/panel-secret/
-#       public/*                 -> /home/conexiatec/panel.conexiatec.com/
+#  SUBIDA AISLADA — Panel Agentes Voz IA (cPanel de Conexia)
+#  Sube panel-secret/config.prod.php -> /home/conexiatec/panel-secret/config.php
+#       public/*                      -> /home/conexiatec/agentsellingpanel.conexiatec.com/
 #  SOLO escribe dentro de esas dos rutas. No toca nada más.
 #
 #  SEGURIDAD: $GO = $false por defecto (solo lista lo que haría).
@@ -48,13 +48,18 @@ function Upload-Tree($localRoot, $remoteRoot) {
 }
 
 "== SUBIDA ==  GO=$GO"
-"-- secreto (fuera del docroot) --"
+"-- secreto (fuera del docroot): sube config.prod.php COMO config.php --"
 Remote-Mkdir "/" "panel-secret"
-$cfg = Join-Path $APP "panel-secret\config.php"
-if (Test-Path $cfg) { Remote-Upload $cfg $SECRET_REMOTE } else { "  (config.php no existe aún; ejecuta provision.ps1 primero)" }
+$cfgProd = Join-Path $APP "panel-secret\config.prod.php"
+if (Test-Path $cfgProd) {
+  $tmp = Join-Path ([IO.Path]::GetTempPath()) "config.php"
+  Copy-Item $cfgProd $tmp -Force
+  Remote-Upload $tmp $SECRET_REMOTE          # se sube con nombre config.php
+  Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+} else { "  (config.prod.php no existe; ejecuta provision.ps1 primero)" }
 
 "-- público (docroot) --"
 Upload-Tree (Join-Path $APP "public") $DOCROOT_REMOTE
 
 if (-not $GO) { "`n[Modo comprobación] No se ha subido nada. Pon `$GO = `$true para subir de verdad." }
-else { "`nSUBIDA COMPLETA. Verifica en https://panel.conexiatec.com/" }
+else { "`nSUBIDA COMPLETA. Verifica en https://agentsellingpanel.conexiatec.com/" }

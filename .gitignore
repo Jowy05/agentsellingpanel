@@ -1,5 +1,6 @@
 # Secretos — NUNCA subir
 panel-secret/config.php
+panel-secret/config.prod.php
 *.env
 .env*
 *.key

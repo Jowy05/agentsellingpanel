@@ -1,30 +1,32 @@
 <?php
-// Copia este archivo a config.php (en /home/conexiatec/panel-secret/) y rellena los secretos.
-// config.php vive FUERA del docroot y NUNCA se sube a git.
+// PLANTILLA de configuración de PRODUCCIÓN. provision.ps1 la rellena y genera panel-secret/config.prod.php,
+// que upload.ps1 sube como /home/conexiatec/panel-secret/config.php (FUERA del docroot, nunca en git).
 return [
   'db' => [
+    'driver'  => 'mysql',
     'host'    => 'localhost',
     'name'    => 'conexiatec_panel',
     'user'    => 'conexiatec_panel',
-    'pass'    => '__PON_AQUI_LA_PASS_DE_LA_BD__',
+    'pass'    => '__DB_PASS__',
     'charset' => 'utf8mb4',
   ],
   'pbx' => [
     'base'   => 'https://sip.conexiatec.com',
-    'server' => 18,                                   // tenant 216 = server 18
-    'apikey' => '__PON_AQUI_LA_APIKEY_DEL_TENANT__',  // clave del tenant, NUNCA la master
+    'server' => 18,                                   // tenant 216 = server 18 (por defecto; se resuelve por código)
+    'apikey' => '__PBX_APIKEY__',                     // clave del PBX; vive SOLO aquí (fuera del docroot), nunca en el navegador
   ],
   'app' => [
     'env'            => 'prod',
     'allowed_origin' => 'https://agentsellingpanel.conexiatec.com',
     'session_name'   => 'cxpanel',
     'totp_issuer'    => 'Conexia Panel',
-    'cdr_date_fmt'   => 'M-d-Y',                       // PHP date() -> "Jun-01-2026"
-    'auto_cut_100'   => false,                         // true = corta el agente automáticamente al 100% (did.edit a IVR)
+    'cdr_date_fmt'   => 'M-d-Y',
+    'auto_cut_100'   => true,                          // corta el agente automáticamente al 100% (did.edit a IVR)
+    'cron_token'     => '__CRON_TOKEN__',              // protege api/cron.php cuando se llama por web (?token=...)
   ],
   'n8n' => [
-    'webhook' => '',                                   // URL del webhook de avisos (workflow PANEL-AGENTE-IA-MAIL)
-    'token'   => '',                                   // valor de la cabecera x-panel-token que protege el webhook
-    'cc'      => '',                                   // copia del aviso (pruebas: jowy; prod: SAC)
+    'webhook' => '__N8N_WEBHOOK__',                   // workflow PANEL-AGENTE-IA-MAIL
+    'token'   => '__N8N_TOKEN__',                     // cabecera x-panel-token
+    'cc'      => '__N8N_CC__',                         // copia del aviso (PROD: SAC)
   ],
 ];

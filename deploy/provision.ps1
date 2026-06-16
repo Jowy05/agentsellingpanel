@@ -14,6 +14,7 @@ $ROOTDOMAIN = "conexiatec.com"
 $DOCROOT_DIR = "agentsellingpanel.conexiatec.com"   # relativo a /home/conexiatec
 $DB = "conexiatec_panel"
 $DBUSER = "conexiatec_panel"
+$CC = "sac@conexiatec.com"   # copia de los avisos en PROD (confirmar el correo real de SAC)
 
 $cp = "https://conexiatec.com:2083"
 $sh = "C:\Users\Lucia\Documents\WEB CONEXIA\_tooling\deploy\_upload-design-v140.sh"
@@ -40,9 +41,11 @@ $dbExists = @($dbs) -contains $DB
 if (-not $GO) { "`n[Modo comprobación] No se ha creado nada. Revisa el plan y pon `$GO = `$true para ejecutar."; return }
 if ($subExists -or $dbExists) { throw "ABORTADO: el subdominio o la BD ya existen. No se sobrescribe nada." }
 
-# --- Generar contraseña fuerte para la BD ---
+# --- Generar contraseña fuerte para la BD + token del cron (sin comillas ni backslash) ---
 $chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#%*-_'.ToCharArray()
 $dbpass = -join (1..28 | ForEach-Object { $chars | Get-Random })
+$hexchars = '0123456789abcdef'.ToCharArray()
+$crontoken = -join (1..40 | ForEach-Object { $hexchars | Get-Random })
 
 # --- Crear recursos NUEVOS ---
 "Creando subdominio..."
@@ -58,11 +61,10 @@ $r3 = UAPI-Post "Mysql/create_user" @{ name=$DBUSER; password=$dbpass }
 $r4 = UAPI-Post "Mysql/set_privileges_on_database" @{ user=$DBUSER; database=$DB; privileges="ALL PRIVILEGES" }
 "  status=" + $r4.status + "  " + ($r4.errors -join "; ")
 
-# --- Construir config.php real (fuera del docroot) con los secretos ---
-$pbxkey = (Get-Content "C:\Users\Lucia\Documents\AI AGENT\credenciales.md")[1].Trim()
-$cfgPath = "C:\Users\Lucia\Documents\Panel-Minutos-App\panel-secret\config.php"
-$sample = Get-Content "C:\Users\Lucia\Documents\Panel-Minutos-App\panel-secret\config.sample.php" -Raw
-$cfg = $sample.Replace("__PON_AQUI_LA_PASS_DE_LA_BD__", $dbpass).Replace("__PON_AQUI_LA_APIKEY_DEL_TENANT__", $pbxkey)
-[System.IO.File]::WriteAllText($cfgPath, $cfg, (New-Object System.Text.UTF8Encoding($false)))
-"config.php generado en panel-secret\config.php (NO se sube a git; lo sube upload.ps1 a /home/conexiatec/panel-secret/)."
-"PROVISIÓN COMPLETA. Siguiente: importar schema.sql y ejecutar upload.ps1."
+# --- Construir config.prod.php (fuera del docroot) con TODOS los secretos. NO toca el config.php local (sqlite). ---
+$php = "C:\Users\Lucia\Documents\Panel-Minutos-App\.localtools\php\php.exe"
+$ini = "C:\Users\Lucia\Documents\Panel-Minutos-App\.localtools\php\php.ini"
+$builder = "C:\Users\Lucia\Documents\Panel-Minutos-App\deploy\build_prod_config.php"
+& $php -c $ini $builder $dbpass $crontoken $CC
+"config.prod.php generado en panel-secret\ (NO va a git; upload.ps1 lo sube como /home/conexiatec/panel-secret/config.php)."
+"PROVISIÓN COMPLETA. Siguiente: (1) importar schema.sql en la BD, (2) ejecutar upload.ps1, (3) seed_admin, (4) cron."
