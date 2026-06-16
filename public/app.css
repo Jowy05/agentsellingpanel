@@ -32,5 +32,26 @@
 .kpi .v { font-family: var(--font-display); font-weight: 700; font-size: 30px; margin-top: 4px; color: var(--text); }
 .kpi .f { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
 .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; padding: 11px 18px; border-radius: 999px; font-size: 13px; z-index: 200; box-shadow: var(--shadow-lg); max-width: 90%; }
+
+/* Notificaciones / avisos de consumo */
+.notif-wrap { position: relative; display: inline-flex; }
+.notif-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); cursor: pointer; transition: all .15s ease; }
+.notif-btn:hover { color: var(--text); border-color: var(--border-strong); }
+.notif-btn svg { width: 18px; height: 18px; }
+.notif-btn.has-alert.warn { color: var(--c-warn); border-color: color-mix(in srgb, var(--c-warn) 50%, transparent); }
+.notif-btn.has-alert.danger { color: var(--c-danger); border-color: color-mix(in srgb, var(--c-danger) 50%, transparent); }
+.notif-badge { position: absolute; top: -4px; right: -4px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; background: var(--c-danger); color: #fff; font-size: 10px; font-weight: 700; line-height: 1; display: none; align-items: center; justify-content: center; }
+.notif-badge.warn { background: var(--c-warn); }
+.notif-badge.show { display: inline-flex; }
+.notif-dropdown { position: absolute; top: 48px; right: 0; width: min(330px, 86vw); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-lg); z-index: 130; overflow: hidden; }
+.notif-dropdown .nd-head { padding: 12px 14px; border-bottom: 1px solid var(--border); font-family: var(--font-display); font-weight: 600; font-size: 14px; }
+.notif-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.notif-item:last-child { border-bottom: none; }
+.notif-empty { padding: 18px 14px; color: var(--text-3); font-size: 13px; text-align: center; }
+
+@keyframes cxblinkWarn   { 0%,49% { color: var(--c-warn);   } 50%,100% { color: var(--text); } }
+@keyframes cxblinkDanger { 0%,49% { color: var(--c-danger); } 50%,100% { color: var(--text); } }
+#app-name.blink-warn   { animation: cxblinkWarn 1s steps(1,end) infinite; }
+#app-name.blink-danger { animation: cxblinkDanger .8s steps(1,end) infinite; }
 .empty-note { padding: 40px 20px; text-align: center; color: var(--text-3); }
 @media (max-width: 720px) { .form-grid { grid-template-columns: 1fr; } .kpi-row { grid-template-columns: 1fr 1fr; } }

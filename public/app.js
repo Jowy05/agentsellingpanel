@@ -5,6 +5,9 @@
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
   var S = { user:null, clients:[], periodo:'', view:'clientes' };
+  var ACK_KEY = 'cx_alerts_ack';
+  var DOC_TITLE = 'Panel Agentes Voz IA — Conexia';
+  var BELL_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20a2 2 0 0 0 4 0"/></svg>';
 
   async function api(path, body){
     var opt = { method: body ? 'POST':'GET', credentials:'same-origin', headers:{} };
@@ -40,7 +43,7 @@
   }
 
   /* ============ LOGIN ============ */
-  function authShell(inner){ app.innerHTML = '<div class="auth-wrap"><div class="card auth-card" style="padding:30px 28px"><div class="auth-logo"></div>'+inner+'</div></div>'; }
+  function authShell(inner){ document.title = DOC_TITLE; app.innerHTML = '<div class="auth-wrap"><div class="card auth-card" style="padding:30px 28px"><div class="auth-logo"></div>'+inner+'</div></div>'; }
 
   function renderLogin(){
     authShell(
@@ -138,14 +141,60 @@
     app.innerHTML =
       '<div class="app">'+
       '<div class="topbar"><div class="brand"><div class="logo"></div><div class="divider"></div>'+
-        '<div class="titles"><div class="kicker">Conexia</div><h1>Panel Agentes Voz IA</h1></div></div>'+
+        '<div class="titles"><div class="kicker">Conexia</div><h1 id="app-name">Panel Agentes Voz IA</h1></div></div>'+
         '<div class="topbar-right"><span class="userchip">'+esc(S.user.nombre)+' · '+esc(S.user.rol)+'</span>'+
+        '<div class="notif-wrap"><button class="notif-btn" id="notif" title="Notificaciones" aria-label="Notificaciones">'+BELL_SVG+'<span class="notif-badge" id="notif-badge"></span></button></div>'+
         '<button class="theme-toggle" id="logout">Salir</button></div></div>'+
       '<div class="nav"><div class="nav-segmented">'+views.map(function(v){return '<button class="seg'+(v[0]===S.view?' active':'')+'" data-v="'+v[0]+'">'+v[1]+'</button>';}).join('')+'</div></div>'+
       '<div id="view"></div></div>';
     document.getElementById('logout').addEventListener('click', async function(){ await api('logout.php',{}); renderLogin(); });
+    document.getElementById('notif').addEventListener('click', function(e){ e.stopPropagation(); toggleNotif(); });
     app.querySelectorAll('.seg').forEach(function(b){ b.addEventListener('click', function(){ S.view=b.dataset.v; renderView(); }); });
     renderView();
+  }
+
+  /* ---- Avisos / notificaciones ---- */
+  function computeAlerts(){
+    var list = S.clients.filter(function(c){ return c.porcentaje >= 75; })
+      .map(function(c){ return { nombre:c.nombre, pct:c.porcentaje, level: c.porcentaje>=100?'danger':'warn' }; })
+      .sort(function(a,b){ return b.pct - a.pct; });
+    var level = list.some(function(x){ return x.level==='danger'; }) ? 'danger' : (list.length ? 'warn' : null);
+    var sig = list.map(function(x){ return x.nombre+':'+x.level; }).join('|');
+    return { list:list, level:level, sig:sig };
+  }
+  function alertsAcked(sig){ try { return localStorage.getItem(ACK_KEY) === sig; } catch(e){ return false; } }
+  function ackAlerts(sig){ try { localStorage.setItem(ACK_KEY, sig); } catch(e){} }
+
+  function updateAlerts(){
+    var a = computeAlerts();
+    var unacked = a.sig !== '' && !alertsAcked(a.sig);
+    var name = document.getElementById('app-name');
+    if (name){ name.classList.remove('blink-warn','blink-danger'); if (unacked && a.level) name.classList.add(a.level==='danger'?'blink-danger':'blink-warn'); }
+    var btn = document.getElementById('notif');
+    if (btn){ btn.classList.remove('has-alert','warn','danger'); if (a.list.length) btn.classList.add('has-alert', a.level); }
+    var badge = document.getElementById('notif-badge');
+    if (badge){ badge.textContent = a.list.length ? String(a.list.length) : ''; badge.className = 'notif-badge' + (a.list.length ? (' show' + (a.level==='warn' ? ' warn' : '')) : ''); }
+    document.title = (unacked && a.list.length ? '('+a.list.length+') ' : '') + DOC_TITLE;
+    return a;
+  }
+
+  function toggleNotif(){
+    var wrap = document.querySelector('.notif-wrap'); if (!wrap) return;
+    var open = wrap.querySelector('.notif-dropdown');
+    if (open){ open.remove(); return; }
+    var a = computeAlerts();
+    var items = a.list.length ? a.list.map(function(x){
+      var badge = x.level==='danger'
+        ? '<span class="state-badge cortado"><span class="sd"></span>100%</span>'
+        : '<span class="state-badge aviso"><span class="sd"></span>Aviso</span>';
+      return '<div class="notif-item"><span><b>'+esc(x.nombre)+'</b> · '+x.pct+'%</span>'+badge+'</div>';
+    }).join('') : '<div class="notif-empty">Sin avisos. Todo dentro de lo previsto.</div>';
+    var dd = document.createElement('div'); dd.className = 'notif-dropdown';
+    dd.innerHTML = '<div class="nd-head">Avisos de consumo</div>' + items;
+    wrap.appendChild(dd);
+    ackAlerts(a.sig);   // abrir el panel = marcar como leído -> deja de parpadear
+    updateAlerts();
+    setTimeout(function(){ document.addEventListener('click', function onDoc(e){ if (!wrap.contains(e.target)){ dd.remove(); document.removeEventListener('click', onDoc); } }); }, 0);
   }
 
   function renderView(){
@@ -156,6 +205,7 @@
     else if (S.view==='stats'){ v.innerHTML=viewStats(); }
     else if (S.view==='mail'){ v.innerHTML=viewMail(); bindMail(); }
     else if (S.view==='equipo'){ viewEquipo(v); }
+    updateAlerts();
   }
 
   /* ---- Clientes (CRUD) ---- */
