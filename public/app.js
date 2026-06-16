@@ -311,9 +311,16 @@
       o.minutos_contratados = parseInt(fd.get('minutos_contratados')||'0',10)||0;
       if(!o.nombre){ showErr('cli-err','El nombre es obligatorio.'); return; }
       var r=await api('clients.php', o);
-      if(r.data && (r.data.ok || r.data.id)){ close(); toast('Cliente guardado'); await reloadClients(); renderView(); }
+      if(r.data && (r.data.ok || r.data.id)){ close(); toast('Cliente guardado'); await reloadClients(); renderView(); if(c) maybePromptReactivar(c.id); }
       else showErr('cli-err', emsg(r.data));
     });
+  }
+  // Si tras ampliar minutos el cliente baja del 100% y tiene agentes cortados, abre el popup de reactivación con el enlace.
+  async function maybePromptReactivar(clientId){
+    var cli=findClient(clientId); if(!cli || cli.porcentaje>=100) return;
+    var r=await api('agents.php',{action:'list',client_id:clientId});
+    var ags=((r.data&&r.data.agentes)||[]).filter(function(a){ return a.estado_desvio==='cortado' && a.ddi; });
+    if(ags.length) openCorteGuide(ags[0], cli);
   }
 
   function openFicha(c){
@@ -401,10 +408,11 @@
       '<h3 class="mh-name">Reactivar el agente en la centralita</h3>'+
       '<div class="mh-meta">'+esc(a.nombre)+' · DID '+did+'</div></div>'+
       '<button class="x-close" id="xg">✕</button></div><div class="modal-body">'+
-      '<p class="muted" style="margin:0 0 16px">El <b>corte al 100% es automático</b> (el panel desvía el DID al IVR de corte <code>'+esc(corte)+'</code>). La <b>reactivación es manual</b>: cuando el cliente amplíe minutos, devuélvelo al agente en PBXware — 3 clics:</p>'+
+      '<p class="muted" style="margin:0 0 14px">El <b>corte al 100% es automático</b> (el panel desvía el DID al IVR de corte <code>'+esc(corte)+'</code>). La <b>reactivación es manual</b>: cuando el cliente amplíe minutos, devuélvelo al agente — 3 clics:</p>'+
+      '<a id="gui-link" class="btn btn-primary" style="display:block;text-align:center;margin:0 0 16px;pointer-events:none;opacity:.6" target="_blank" rel="noopener">🔗 Generando enlace al DID…</a>'+
       '<div style="margin:0 0 8px"><div style="font-weight:700;margin-bottom:6px;color:var(--c-ok)">Reactivar</div>'+
       '<ol style="margin:0;padding-left:20px;line-height:1.9">'+
-        '<li>Entra en PBXware → menú <b>DIDs</b> → abre el DID <code>'+did+'</code>.</li>'+
+        '<li>Pulsa el botón de arriba (te abre el DID <code>'+did+'</code> en PBXware) o ve a <b>DIDs</b> y ábrelo.</li>'+
         '<li>En <b>Destination</b> elige <b>«AI Voice Agents»</b> → Value = <code>'+esc(a.nombre)+'</code>.</li>'+
         '<li>Pulsa <b>Guardar</b>.</li>'+
         '<li>Vuelve al panel y pulsa <b>«✅ Marcar reactivado»</b>.</li></ol></div>'+
@@ -415,6 +423,17 @@
     function close(){ scrim.remove(); }
     document.getElementById('xg').addEventListener('click', close);
     scrim.addEventListener('click', function(e){ if(e.target===scrim) close(); });
+    // Resuelve el enlace directo a la pantalla de edición del DID.
+    api('agents.php',{action:'gui_url',id:a.id}).then(function(r){
+      var link=document.getElementById('gui-link'); if(!link) return;
+      if(r.data&&r.data.ok&&r.data.url){
+        link.href=r.data.url; link.style.pointerEvents='auto'; link.style.opacity='1';
+        link.textContent='🔗 Abrir el DID '+(a.ddi||'')+' en la centralita';
+      } else {
+        link.style.opacity='1'; link.classList.remove('btn-primary'); link.classList.add('btn-ghost');
+        link.textContent='⚠ No se pudo generar el enlace (ábrelo a mano: DIDs)';
+      }
+    });
   }
   async function refreshConsumo(clientId){
     toast('Actualizando consumo desde el CDR… puede tardar unos segundos');

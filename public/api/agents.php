@@ -122,6 +122,24 @@ switch ($action) {
         break;
     }
 
+    // URL directa a la pantalla de edición del DID en la GUI de PBXware (para reactivar a mano).
+    case 'gui_url': {
+        $st = db()->prepare('SELECT ag.ddi, c.tenant FROM agentes ag JOIN clientes c ON c.id = ag.cliente_id WHERE ag.id = ?');
+        $st->execute([(int)($in['id'] ?? 0)]);
+        $a = $st->fetch();
+        if (!$a) json_out(['error' => 'Agente no encontrado.'], 404);
+        $ddi = trim((string)($a['ddi'] ?? ''));
+        if ($ddi === '') json_out(['error' => 'El agente no tiene DDI.'], 422);
+        $server = pbx_tenant_server(trim((string)$a['tenant']));
+        if ($server === null) json_out(['error' => 'Tenant no encontrado en la centralita.'], 404);
+        $didId = pbx_did_id($server, $ddi);
+        if ($didId === null) json_out(['error' => 'DID no encontrado en la centralita.'], 404);
+        $base = rtrim((string)(cfg()['pbx']['base'] ?? ''), '/');
+        $url = $base . '/?app=pbxware&t=dids&v=dids:edit&id=' . rawurlencode($didId) . '&server=' . rawurlencode((string)$server);
+        json_out(['ok' => true, 'url' => $url, 'ddi' => $ddi, 'did_id' => $didId, 'server' => $server]);
+        break;
+    }
+
     default:
         json_out(['error' => 'Acción no válida.'], 400);
 }
