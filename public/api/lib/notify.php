@@ -52,19 +52,28 @@ function aviso_consumo_html(string $nombre, int $nivel, int $usado, int $contr):
   return ['subject' => $subject, 'html' => $html];
 }
 
-// Comprueba el umbral del cliente y envía el aviso UNA sola vez por (cliente, periodo, nivel).
+// Comprueba el umbral del cliente y envía el aviso UNA vez por (cliente, periodo, nivel).
+// Los flags se RESETEAN al bajar del umbral (p.ej. al ampliar minutos), para volver a avisar si se vuelve a cruzar
+// — sin spam, porque el uso solo baja al recargar minutos.
 function avisar_consumo_si_corresponde(array $cli, int $usado, int $contr): void {
   $correo = trim((string)($cli['correo'] ?? ''));
   if ($correo === '' || $contr <= 0) return;
   $pct     = (int)round($usado / $contr * 100);
-  $nivel   = $pct >= 100 ? 100 : ($pct >= 75 ? 75 : 0);
-  if ($nivel === 0) return;
-
   $cliId   = (int)$cli['id'];
   $periodo = date('Y-m');
+
+  if ($pct < 75) {   // por debajo del umbral: limpiar flags -> permite re-avisar al volver a subir
+    db()->prepare('DELETE FROM avisos_email WHERE cliente_id = ? AND periodo = ?')->execute([$cliId, $periodo]);
+    return;
+  }
+  if ($pct < 100) {  // entre 75 y 100: resetea el flag de 100 (por si bajó desde 100 tras recargar)
+    db()->prepare('DELETE FROM avisos_email WHERE cliente_id = ? AND periodo = ? AND nivel = 100')->execute([$cliId, $periodo]);
+  }
+  $nivel = $pct >= 100 ? 100 : 75;
+
   $chk = db()->prepare('SELECT 1 FROM avisos_email WHERE cliente_id = ? AND periodo = ? AND nivel = ?');
   $chk->execute([$cliId, $periodo, $nivel]);
-  if ($chk->fetchColumn()) return;   // ya enviado este nivel en este periodo
+  if ($chk->fetchColumn()) return;   // ya enviado este nivel (y no ha bajado del umbral desde entonces)
 
   $msg = aviso_consumo_html((string)$cli['nombre'], $nivel, $usado, $contr);
   $ok  = n8n_webhook_post(['to' => $correo, 'subject' => $msg['subject'], 'html' => $msg['html']]);
