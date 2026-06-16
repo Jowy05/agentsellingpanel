@@ -3,10 +3,10 @@ declare(strict_types=1);
 // Cliente PBXware. La clave vive en config (fuera del docroot) y nunca se expone al navegador.
 // Operaciones usadas (lista blanca): cdr.download (lectura), ext.list, did.list, did.edit.
 
-function pbx_call(string $object, string $method, array $params = []): array {
+function pbx_call(string $object, string $method, array $params = [], ?int $server = null): array {
   $c = cfg()['pbx'];
   $q = http_build_query(array_merge([
-    'server' => $c['server'],
+    'server' => $server ?? $c['server'],
     'apikey' => $c['apikey'],
     'action' => "pbxware.$object.$method",
   ], $params));
@@ -41,26 +41,57 @@ function pbx_ping(): array {
   return ['ok' => true, 'http' => $r['http'], 'extensiones' => $n];
 }
 
-// Suma minutos del CDR cuyos campos From/To contengan $needle (DID/extensión del agente),
-// en el rango [start, end] con formato Mmm-DD-YYYY (p.ej. "Jun-01-2026").
-// NOTA: el parámetro de paginación ('page') está pendiente de confirmar contra la API real;
-// hoy se sabe que la respuesta trae 'next_page' y ~16 registros por página.
-function pbx_cdr_minutos(string $needle, string $start, string $end): array {
-  $page = 0; $segundos = 0; $registros = 0; $guard = 0; $next = false;
-  do {
-    $r = pbx_call('cdr', 'download', ['start' => $start, 'end' => $end, 'page' => $page]);
-    if (!$r['ok']) return $r;
-    $d = $r['data'];
-    foreach (($d['csv'] ?? []) as $row) {
-      $from = (string)($row[0] ?? '');
-      $to   = (string)($row[1] ?? '');
-      if (stripos($from, $needle) !== false || stripos($to, $needle) !== false) {
-        $segundos += (int)($row[3] ?? 0);     // columna "Total Duration"
-        $registros++;
+// Suma los minutos del CDR de las llamadas del DDI dado, en [start,end] (formato Mmm-DD-YYYY),
+// consultando DÍA A DÍA. El CDR pagina a máximo 1000 registros sin offset, así que se acota por
+// fecha (un día de un tenant suele ir muy por debajo de 1000) para no perder llamadas.
+function pbx_cdr_minutos(string $ddi, string $start, string $end, ?int $server = null): array {
+  $d1 = DateTime::createFromFormat('M-d-Y', $start);
+  $d2 = DateTime::createFromFormat('M-d-Y', $end);
+  if (!$d1 || !$d2) return ['ok' => false, 'error' => 'fecha_invalida'];
+  $d1->setTime(0, 0); $d2->setTime(0, 0);
+  $seg = 0; $reg = 0; $guard = 0; $cur = clone $d1;
+  while ($cur <= $d2 && $guard < 92) {
+    $dia = $cur->format('M-d-Y');
+    $r = pbx_call('cdr', 'download', ['start' => $dia, 'end' => $dia, 'limit' => 1000], $server);
+    if (!empty($r['ok']) && is_array($r['data'])) {
+      foreach (($r['data']['csv'] ?? []) as $row) {
+        $from = (string)($row[0] ?? ''); $to = (string)($row[1] ?? '');
+        if ($from === $ddi || $to === $ddi
+            || strpos($from, '(' . $ddi . ')') !== false
+            || strpos($to,   '(' . $ddi . ')') !== false) {
+          $seg += (int)($row[3] ?? 0);   // Total Duration (s)
+          $reg++;
+        }
       }
     }
-    $next = !empty($d['next_page']);
-    $page++; $guard++;
-  } while ($next && $guard < 500);
-  return ['ok' => true, 'minutos' => (int)round($segundos / 60), 'segundos' => $segundos, 'registros' => $registros];
+    $cur->modify('+1 day'); $guard++;
+  }
+  return ['ok' => true, 'minutos' => (int)round($seg / 60), 'segundos' => $seg, 'registros' => $reg];
+}
+
+// Resuelve el código de tenant (p.ej. "216") al número de servidor de la API (p.ej. 18).
+// Usa pbxware.tenant.list en el master (server=1): cada entrada va keyed por el nº de servidor.
+function pbx_tenant_server(string $code): ?int {
+  $r = pbx_call('tenant', 'list', [], 1);
+  if (empty($r['ok']) || !is_array($r['data'])) return null;
+  foreach ($r['data'] as $srv => $t) {
+    if (is_array($t) && (string)($t['tenantcode'] ?? '') === $code) return (int)$srv;
+  }
+  return null;
+}
+
+// Lista los agentes de voz IA de un tenant: DIDs cuyo destino (ext) es un UUID.
+// Devuelve [{uuid, nombre, ddi}] con nombre = nombre del DID y ddi = número del DID.
+function pbx_list_agents(int $server): array {
+  $r = pbx_call('did', 'list', [], $server);
+  if (empty($r['ok']) || !is_array($r['data'])) return ['ok' => false, 'error' => 'did_list'];
+  $ag = [];
+  foreach ($r['data'] as $d) {
+    if (!is_array($d)) continue;
+    $ext = (string)($d['ext'] ?? '');
+    if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $ext)) {
+      $ag[] = ['uuid' => $ext, 'nombre' => (string)($d['name'] ?? ''), 'ddi' => (string)($d['number'] ?? '')];
+    }
+  }
+  return ['ok' => true, 'agentes' => $ag];
 }
