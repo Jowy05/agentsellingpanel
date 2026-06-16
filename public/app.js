@@ -287,14 +287,7 @@
   function openFicha(c){
     if(!c) return;
     var pct=c.porcentaje, restantes=c.minutos_contratados - c.minutos_usados;
-    var divert = isAdmin() ? (
-      '<div class="modal-agents"><div class="ma-title">Desvío del DID (PBX)</div>'+
-      '<div class="cut-hint">DDI '+esc(c.ddi||'—')+' · al 100% se desvía a: <b>'+esc(c.desvio_100||'—')+'</b>. Estado: <b>'+esc(c.estado_desvio||'normal')+'</b></div>'+
-      '<div style="display:flex;gap:10px;margin-top:10px">'+
-        '<button class="btn btn-ghost" id="do-cut">Cortar (desviar a IVR de corte)</button>'+
-        '<button class="btn btn-ghost" id="do-restore">Restaurar</button></div>'+
-      '<div class="muted" style="margin-top:8px">Acciona la centralita real (pbxware.did.edit).</div></div>'
-    ) : '';
+    var agentsSection = '<div class="modal-agents" id="ficha-agents"><div class="ma-title">Agentes IA</div><div class="muted" style="padding:6px 0">Cargando…</div></div>';
     var html='<div class="modal-scrim" id="scrimf"><div class="modal"><div class="modal-head"><div>'+
       '<h3 class="mh-name">'+esc(c.nombre)+'</h3><div class="mh-meta">'+esc(c.sector||'—')+' · '+esc(c.plan||'—')+'</div></div>'+
       '<button class="x-close" id="xf">✕</button></div><div class="modal-body">'+
@@ -305,22 +298,68 @@
       '<div class="kv"><div class="k">Correo</div><div class="v" style="font-size:13px;font-family:var(--font-mono)">'+esc(c.correo||'—')+'</div></div>'+
       '<div class="kv"><div class="k">Tenant</div><div class="v" style="font-family:var(--font-mono)">'+esc(c.tenant||'—')+'</div></div>'+
       '<div class="kv"><div class="k">DDI</div><div class="v" style="font-family:var(--font-mono)">'+esc(c.ddi||'—')+'</div></div></div>'+
-      divert+'</div></div></div>';
+      agentsSection+'</div></div></div>';
     var wrap=document.createElement('div'); wrap.innerHTML=html; document.body.appendChild(wrap.firstChild);
     var scrim=document.getElementById('scrimf');
     function close(){ scrim.remove(); }
     document.getElementById('xf').addEventListener('click', close);
     scrim.addEventListener('click', function(e){ if(e.target===scrim) close(); });
-    if(isAdmin()){
-      document.getElementById('do-cut').addEventListener('click', function(){ doDivert(c.id,'cut',close); });
-      document.getElementById('do-restore').addEventListener('click', function(){ doDivert(c.id,'restore',close); });
-    }
+    loadFichaAgents(c);
   }
-  async function doDivert(id, action, close){
-    if(!confirm('Esto cambia el desvío en la CENTRALITA REAL. ¿Continuar?')) return;
-    var r=await api('divert.php',{client_id:id, action:action});
-    if(r.status===200 && r.data.ok){ toast('Desvío '+(action==='cut'?'aplicado':'restaurado')); close&&close(); await reloadClients(); renderView(); }
-    else toast('PBX: '+emsg(r.data));
+
+  async function loadFichaAgents(c){
+    var box=document.getElementById('ficha-agents'); if(!box) return;
+    var r=await api('agents.php',{action:'list',client_id:c.id});
+    var ags=(r.data&&r.data.agentes)||[];
+    var rows = ags.length ? ags.map(function(a){
+      return '<div class="agent-row"><div class="agent-meta"><div>'+
+        '<div class="agent-name">'+esc(a.nombre)+'</div>'+
+        '<div class="agent-sub">DDI '+esc(a.ddi||'—')+(a.dial_number?' · dial '+esc(a.dial_number):'')+' · corte: '+esc(a.ivr_corte||'(def. cliente)')+'</div></div></div>'+
+        '<div class="agent-end"><button class="icon-btn danger" data-delag="'+a.id+'" title="Quitar agente">🗑</button></div></div>';
+    }).join('') : '<div class="muted" style="padding:6px 0">Sin agentes. Pulsa «Leer agentes» o «Agregar agente».</div>';
+    box.innerHTML = '<div class="ma-title">Agentes IA</div>'+rows+
+      '<div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">'+
+      '<button class="btn btn-ghost btn-sm" id="ag-read">↻ Leer agentes de la centralita</button>'+
+      '<button class="btn btn-primary btn-sm" id="ag-add">+ Agregar agente</button></div>'+
+      '<div class="muted" style="margin-top:8px">«Leer» trae los agentes con DID público; el resto se añaden a mano con su dial number.</div>';
+    document.getElementById('ag-add').addEventListener('click', function(){ openAgentForm(c.id); });
+    document.getElementById('ag-read').addEventListener('click', function(){ readAgents(c.id); });
+    box.querySelectorAll('[data-delag]').forEach(function(b){ b.addEventListener('click', async function(){
+      if(!confirm('¿Quitar este agente?')) return;
+      var rr=await api('agents.php',{action:'delete',id:+b.dataset.delag});
+      if(rr.data&&rr.data.ok){ toast('Agente quitado'); loadFichaAgents(c); } else toast(emsg(rr.data));
+    });});
+  }
+  async function readAgents(clientId){
+    toast('Leyendo agentes de la centralita…');
+    var r=await api('agents.php',{action:'read',client_id:clientId});
+    if(!(r.data&&r.data.agentes)){ toast(emsg(r.data)); return; }
+    if(!r.data.agentes.length){ toast('La centralita no devolvió agentes con DID directo. Añádelos a mano.'); return; }
+    var nuevos=r.data.agentes.filter(function(a){return !a.ya_dado_alta;});
+    if(!nuevos.length){ toast('Los agentes detectados ya están dados de alta.'); return; }
+    var imp=await api('agents.php',{action:'import',client_id:clientId,agentes:nuevos});
+    toast('Importados '+((imp.data&&imp.data.importados)||0)+' agente(s)');
+    var c=findClient(clientId); loadFichaAgents(c||{id:clientId});
+  }
+  function openAgentForm(clientId){
+    var html='<div class="modal-scrim" id="scrimag"><div class="modal" style="max-width:460px"><div class="modal-head"><div><h3 class="mh-name">Agregar agente</h3><div class="mh-meta">Datos del agente de voz</div></div><button class="x-close" id="xag">✕</button></div><div class="modal-body"><form id="f-ag">'+
+      '<div class="field"><label>Nombre</label><input class="field-input" name="nombre" placeholder="Ej. Jarvis" required></div>'+
+      '<div class="field"><label>Dial number (interno)</label><input class="field-input" name="dial_number" placeholder="Número interno del agente"></div>'+
+      '<div class="field"><label>DDI público (opcional)</label><input class="field-input" name="ddi" placeholder="Si tiene número público directo"></div>'+
+      '<div class="field"><label>IVR de corte (opcional)</label><input class="field-input" name="ivr_corte" placeholder="Si vacío, usa el del cliente"></div>'+
+      '<div id="ag-err"></div><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px"><button type="button" class="btn btn-ghost" id="agcancel">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div></form></div></div></div>';
+    var wrap=document.createElement('div'); wrap.innerHTML=html; document.body.appendChild(wrap.firstChild);
+    var scrim=document.getElementById('scrimag'); function close(){ scrim.remove(); }
+    document.getElementById('xag').addEventListener('click', close);
+    document.getElementById('agcancel').addEventListener('click', close);
+    document.getElementById('f-ag').addEventListener('submit', async function(e){
+      e.preventDefault(); var fd=new FormData(e.target);
+      var o={action:'create', client_id:clientId, nombre:(fd.get('nombre')||'').trim(), dial_number:(fd.get('dial_number')||'').trim(), ddi:(fd.get('ddi')||'').trim(), ivr_corte:(fd.get('ivr_corte')||'').trim()};
+      if(!o.nombre || (!o.dial_number && !o.ddi)){ showErr('ag-err','Indica el nombre y al menos el dial number o el DDI.'); return; }
+      var r=await api('agents.php', o);
+      if(r.data&&(r.data.ok||r.data.id)){ close(); toast('Agente agregado'); var c=findClient(clientId); loadFichaAgents(c||{id:clientId}); }
+      else showErr('ag-err', emsg(r.data));
+    });
   }
 
   /* ---- Consumo ---- */
