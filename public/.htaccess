@@ -1,0 +1,21 @@
+# Panel de minutos — seguridad básica del docroot
+Options -Indexes
+
+# Bloquear ficheros sensibles si alguno acabara dentro del docroot (defensa en profundidad)
+<FilesMatch "(^\.|\.(sql|md|log|ini|sample\.php|sh|ps1)$)">
+  Require all denied
+</FilesMatch>
+
+# Forzar HTTPS
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# Cabeceras de seguridad para todo lo servido aquí
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "no-referrer"
+</IfModule>
