@@ -34,6 +34,11 @@ if ($action === 'cut') {
   if ($dest === '') json_out(['error' => 'sin_ivr_de_corte'], 422);
 
   $antes = leer_destino_actual($server, $did);
+  // Seguridad: si el destino actual es el agente (un UUID), did.edit NO puede restaurarlo → no cortar.
+  if ($antes !== null && pbx_es_uuid($antes)) {
+    audit($u['id'], 'desvio_cut_bloqueado', "agente#$agentId did=$did dest_actual=UUID (no restaurable vía API)");
+    json_out(['error' => 'destino_no_restaurable_via_api', 'detalle' => 'El destino actual es un agente IA; la API no permite restaurarlo. Pendiente de Bicom.'], 409);
+  }
   if ($antes !== null && $antes !== '' && $antes !== $dest) {
     db()->prepare('UPDATE agentes SET did_dest_backup = ?, actualizado = NOW() WHERE id = ?')->execute([$antes, $agentId]);
   }

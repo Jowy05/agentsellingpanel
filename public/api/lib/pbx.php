@@ -96,12 +96,19 @@ function pbx_list_agents(int $server): array {
   return ['ok' => true, 'agentes' => $ag];
 }
 
+// ¿Es el string un UUID (destino de un agente de voz IA)?
+function pbx_es_uuid(string $s): bool {
+  return (bool)preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $s);
+}
+
 // --- Desvío del DID de un agente (corte/restauración) — usado por divert.php y por el auto-corte ---
-// TODO Bicom: confirmar los parámetros EXACTOS de pbxware.did.edit. Se usan los mismos nombres
-// de campo que devuelve did.list (number = DID, ext = destino) como mejor conjetura.
+// HALLAZGO (verificado en tenant 216): pbxware.did.edit requiere el "DID ID" (= clave del registro en
+// did.list, p.ej. 71) en el parámetro 'id', y rechaza el destino del agente (un UUID) con CUALQUIER
+// 'type' ("DID destination is not valid for requested destination type"). => No se puede restaurar el
+// DID al agente vía API. PENDIENTE Bicom: formato de did.edit para apuntar/restaurar a un agente IA.
 if (!function_exists('construir_params_did_edit')) {
   function construir_params_did_edit(string $did, string $dest): array {
-    return ['number' => $did, 'ext' => $dest];
+    return ['number' => $did, 'ext' => $dest];   // INCOMPLETO a propósito (sin 'id') → did.edit falla seguro hasta validar con Bicom
   }
 }
 // Destino actual (ext) de un DID según did.list, o null si no se encuentra.
