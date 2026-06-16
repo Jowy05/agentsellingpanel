@@ -18,9 +18,11 @@ $periodo = date('Y-m');
 $inicio  = date('M-d-Y', strtotime(date('Y-m-01')));  // primer día del mes en curso
 $fin     = date('M-d-Y');                               // hoy
 
-$stc = db()->prepare('SELECT id, nombre, tenant FROM clientes' . ($clientId ? ' WHERE id = ?' : ''));
+$stc = db()->prepare('SELECT id, nombre, tenant, minutos_contratados, desvio_100 FROM clientes' . ($clientId ? ' WHERE id = ?' : ''));
 $stc->execute($clientId ? [$clientId] : []);
 $clientes = $stc->fetchAll();
+
+$autoCut = !empty(cfg()['app']['auto_cut_100']);   // auto-corte al 100% (gateado en config hasta validar did.edit)
 
 $upsert = db()->prepare(
     'INSERT INTO consumo (agente_id, periodo, minutos_usados, actualizado)
@@ -35,7 +37,7 @@ foreach ($clientes as $cli) {
     $server = pbx_tenant_server($code);
     if ($server === null) { $resumen[] = ['cliente' => $cli['nombre'], 'error' => 'tenant no encontrado en la centralita']; continue; }
 
-    $sta = db()->prepare('SELECT id, nombre, ddi, dial_number FROM agentes WHERE cliente_id = ?');
+    $sta = db()->prepare('SELECT id, nombre, ddi, dial_number, ivr_corte, estado_desvio FROM agentes WHERE cliente_id = ?');
     $sta->execute([(int)$cli['id']]);
     $agentes = $sta->fetchAll();
 
@@ -53,7 +55,33 @@ foreach ($clientes as $cli) {
         $detalle[] = ['agente' => $a['nombre'], 'minutos' => $min];
     }
     audit($auth['id'], 'metering', 'Cliente #' . $cli['id'] . ': ' . $total . ' min (' . count($agentes) . ' agentes)');
-    $resumen[] = ['cliente' => $cli['nombre'], 'minutos_total' => $total, 'agentes' => $detalle];
+
+    // Auto-corte al 100%: si el total alcanza los minutos contratados, desvía los agentes con DID.
+    $cortados = [];
+    $contr = (int)($cli['minutos_contratados'] ?? 0);
+    if ($autoCut && $contr > 0 && $total >= $contr) {
+        foreach ($agentes as $a) {
+            if (($a['estado_desvio'] ?? '') === 'cortado') continue;
+            $did = trim((string)($a['ddi'] ?? ''));
+            if ($did === '') continue;   // sin DID público no se puede desviar por API
+            $dest = trim((string)($a['ivr_corte'] ?? ''));
+            if ($dest === '') $dest = trim((string)($cli['desvio_100'] ?? ''));
+            if ($dest === '') continue;
+            $antes = leer_destino_actual($server, $did);
+            if ($antes !== null && $antes !== '' && $antes !== $dest) {
+                db()->prepare('UPDATE agentes SET did_dest_backup = ?, actualizado = NOW() WHERE id = ?')->execute([$antes, (int)$a['id']]);
+            }
+            $rr = pbx_call('did', 'edit', construir_params_did_edit($did, $dest), $server);
+            if (!empty($rr['ok'])) {
+                db()->prepare("UPDATE agentes SET estado_desvio = 'cortado', actualizado = NOW() WHERE id = ?")->execute([(int)$a['id']]);
+                audit($auth['id'], 'auto_corte', 'agente#' . $a['id'] . ' did=' . $did . ' dest=' . $dest);
+                $cortados[] = $a['nombre'];
+            } else {
+                audit($auth['id'], 'auto_corte_error', 'agente#' . $a['id'] . ' did=' . $did);
+            }
+        }
+    }
+    $resumen[] = ['cliente' => $cli['nombre'], 'minutos_total' => $total, 'contratado' => $contr, 'agentes' => $detalle, 'cortados' => $cortados];
 }
 
 json_out(['ok' => true, 'periodo' => $periodo, 'resumen' => $resumen]);

@@ -95,3 +95,26 @@ function pbx_list_agents(int $server): array {
   }
   return ['ok' => true, 'agentes' => $ag];
 }
+
+// --- Desvío del DID de un agente (corte/restauración) — usado por divert.php y por el auto-corte ---
+// TODO Bicom: confirmar los parámetros EXACTOS de pbxware.did.edit. Se usan los mismos nombres
+// de campo que devuelve did.list (number = DID, ext = destino) como mejor conjetura.
+if (!function_exists('construir_params_did_edit')) {
+  function construir_params_did_edit(string $did, string $dest): array {
+    return ['number' => $did, 'ext' => $dest];
+  }
+}
+// Destino actual (ext) de un DID según did.list, o null si no se encuentra.
+if (!function_exists('leer_destino_actual')) {
+  function leer_destino_actual(int $server, string $did): ?string {
+    $r = pbx_call('did', 'list', [], $server);
+    if (empty($r['ok']) || !is_array($r['data'])) return null;
+    foreach ($r['data'] as $d) {
+      if (is_array($d) && (string)($d['number'] ?? '') === $did) {
+        $x = $d['ext'] ?? null;
+        return $x === null ? null : (string)$x;
+      }
+    }
+    return null;
+  }
+}

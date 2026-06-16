@@ -3,30 +3,7 @@ declare(strict_types=1);
 // public/api/divert.php — Desvío POR AGENTE. Corta o restaura el destino del DID del agente.
 // POST {agent_id, action:'cut'|'restore'}. audit() SIEMPRE.
 require __DIR__ . '/_bootstrap.php';
-require __DIR__ . '/lib/pbx.php';
-
-// TODO: verificar nombres de params de pbxware.did.edit con la centralita.
-if (!function_exists('construir_params_did_edit')) {
-  function construir_params_did_edit(string $did, string $dest): array {
-    return ['did' => $did, 'destination' => $dest];
-  }
-}
-// Lee el destino actual (ext) del DID en did.list del tenant.
-if (!function_exists('leer_destino_actual')) {
-  function leer_destino_actual(int $server, string $did): ?string {
-    $r = pbx_call('did', 'list', [], $server);
-    if (empty($r['ok']) || !is_array($r['data'])) return null;
-    foreach ($r['data'] as $fila) {
-      if (!is_array($fila)) continue;
-      $num = (string)($fila['number'] ?? $fila['did'] ?? '');
-      if ($num !== '' && $num === $did) {
-        $d = $fila['ext'] ?? $fila['destination'] ?? null;
-        return $d === null ? null : (string)$d;
-      }
-    }
-    return null;
-  }
-}
+require __DIR__ . '/lib/pbx.php';   // construir_params_did_edit() y leer_destino_actual() viven aquí
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') json_out(['error' => 'method_not_allowed'], 405);
 $u = require_auth();

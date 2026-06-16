@@ -136,6 +136,31 @@
   }
   function isAdmin(){ return S.user && S.user.rol==='admin'; }
 
+  /* ---- Auto-refresh: refresca la pantalla cada 10s y re-mide el CDR cada 60s ---- */
+  var AUTO={display:null, meter:null, metering:false}, lastSig='';
+  function modalOpen(){ return !!document.querySelector('.modal-scrim'); }
+  function refreshableView(){ return S.view==='datos'||S.view==='stats'||S.view==='clientes'; }
+  function clientsSig(){ return S.clients.map(function(c){return c.id+':'+c.minutos_usados+':'+c.porcentaje;}).join('|'); }
+  async function autoTick(){
+    if(document.hidden) return;
+    var ok=await reloadClients(); if(ok===false){ stopAuto(); return; }
+    updateAlerts();
+    var sig=clientsSig();
+    if(sig!==lastSig){ lastSig=sig; if(!modalOpen() && refreshableView()) renderView(); }
+  }
+  async function autoMeter(){
+    if(document.hidden || AUTO.metering || !isAdmin()) return;
+    AUTO.metering=true;
+    try{
+      var r=await api('metering.php',{});
+      if(r.status===401){ stopAuto(); renderLogin(); return; }
+      await reloadClients(); updateAlerts(); lastSig=clientsSig();
+      if(!modalOpen() && refreshableView()) renderView();
+    } finally { AUTO.metering=false; }
+  }
+  function startAuto(){ stopAuto(); lastSig=clientsSig(); AUTO.display=setInterval(autoTick,5000); AUTO.meter=setInterval(autoMeter,60000); }
+  function stopAuto(){ if(AUTO.display) clearInterval(AUTO.display); if(AUTO.meter) clearInterval(AUTO.meter); AUTO.display=AUTO.meter=null; }
+
   function renderPanel(){
     var views=[['clientes','Clientes'],['datos','Consumo'],['stats','Stats'],['mail','Avisos']];
     if (isAdmin()) views.push(['equipo','Equipo']);
@@ -148,10 +173,11 @@
         '<button class="theme-toggle" id="logout">Salir</button></div></div>'+
       '<div class="nav"><div class="nav-segmented">'+views.map(function(v){return '<button class="seg'+(v[0]===S.view?' active':'')+'" data-v="'+v[0]+'">'+v[1]+'</button>';}).join('')+'</div></div>'+
       '<div id="view"></div></div>';
-    document.getElementById('logout').addEventListener('click', async function(){ await api('logout.php',{}); renderLogin(); });
+    document.getElementById('logout').addEventListener('click', async function(){ stopAuto(); await api('logout.php',{}); renderLogin(); });
     document.getElementById('notif').addEventListener('click', function(e){ e.stopPropagation(); toggleNotif(); });
     app.querySelectorAll('.seg').forEach(function(b){ b.addEventListener('click', function(){ S.view=b.dataset.v; renderView(); }); });
     renderView();
+    startAuto();
   }
 
   /* ---- Avisos / notificaciones ---- */
@@ -211,7 +237,7 @@
     var v=document.getElementById('view');
     if (S.view==='clientes'){ v.innerHTML=viewClientes(); bindClientes(); }
     else if (S.view==='datos'){ v.innerHTML=viewDatos(); bindDatos(); }
-    else if (S.view==='stats'){ v.innerHTML=viewStats(); }
+    else if (S.view==='stats'){ v.innerHTML=viewStats(); bindStats(); }
     else if (S.view==='mail'){ v.innerHTML=viewMail(); bindMail(); }
     else if (S.view==='equipo'){ viewEquipo(v); }
     updateAlerts();
@@ -412,6 +438,15 @@
   }
 
   /* ---- Stats ---- */
+  function donutSVG(pct){
+    var sz=96, sw=11, r=(sz-sw)/2, c=2*Math.PI*r, p=Math.max(0,Math.min(100,pct)), off=c*(1-p/100);
+    var col = pct>=100?'var(--c-danger)':pct>=75?'var(--c-warn)':'var(--c-ok)';
+    return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 '+sz+' '+sz+'">'+
+      '<g transform="rotate(-90 '+(sz/2)+' '+(sz/2)+')">'+
+      '<circle cx="'+(sz/2)+'" cy="'+(sz/2)+'" r="'+r+'" fill="none" stroke="var(--surface-3)" stroke-width="'+sw+'"/>'+
+      '<circle cx="'+(sz/2)+'" cy="'+(sz/2)+'" r="'+r+'" fill="none" stroke="'+col+'" stroke-width="'+sw+'" stroke-linecap="round" stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'"/></g>'+
+      '<text x="'+(sz/2)+'" y="'+(sz/2)+'" text-anchor="middle" dominant-baseline="central" style="font-family:var(--font-display);font-weight:700;font-size:21px;fill:'+col+'">'+pct+'%</text></svg>';
+  }
   function viewStats(){
     var n=S.clients.length;
     var totC=S.clients.reduce(function(s,c){return s+c.minutos_contratados;},0);
@@ -419,15 +454,24 @@
     var avg= totC? Math.round(totU/totC*100):0;
     var aviso=S.clients.filter(function(c){return c.porcentaje>=75 && c.porcentaje<100;}).length;
     var cort=S.clients.filter(function(c){return c.porcentaje>=100;}).length;
+    var cards = S.clients.slice().sort(function(a,b){return b.porcentaje-a.porcentaje;}).map(function(c){
+      return '<div class="donut-card" data-ficha="'+c.id+'">'+donutSVG(c.porcentaje)+
+        '<div class="dc-name">'+esc(c.nombre)+'</div>'+
+        '<div class="dc-mins">'+c.minutos_usados+' / '+c.minutos_contratados+' min</div>'+
+        '<div style="margin-top:9px">'+estadoBadge(c.porcentaje)+'</div></div>';
+    }).join('');
     return '<div class="kpi-row">'+
       '<div class="kpi"><div class="k">Clientes</div><div class="v">'+n+'</div><div class="f">cartera</div></div>'+
       '<div class="kpi"><div class="k">Consumo medio</div><div class="v">'+avg+'<small>%</small></div><div class="f">'+totU+' / '+totC+' min</div></div>'+
       '<div class="kpi"><div class="k">En aviso</div><div class="v">'+aviso+'</div><div class="f">75–99%</div></div>'+
       '<div class="kpi"><div class="k">Cortados</div><div class="v">'+cort+'</div><div class="f">100% · desvío</div></div></div>'+
-      '<div class="card"><div class="panel-head"><div><h2 class="ph-title">Consumo por cliente</h2><p class="ph-sub">Periodo '+esc(S.periodo)+'</p></div></div>'+
-      '<div class="cli-table">'+ (S.clients.length? S.clients.slice().sort(function(a,b){return b.porcentaje-a.porcentaje;}).map(function(c){
-        return '<div class="cli-row"><div class="cli-name"><b>'+esc(c.nombre)+'</b></div><div class="r cli-pct" style="color:'+(c.porcentaje>=100?'var(--c-danger)':c.porcentaje>=75?'var(--c-warn)':'var(--c-ok)')+'">'+c.porcentaje+'%</div><div class="r">'+estadoBadge(c.porcentaje)+'</div></div>';
-      }).join('') : '<div class="cli-empty">No hay clientes.</div>')+'</div></div>';
+      '<div class="card"><div class="panel-head"><div><h2 class="ph-title">Consumo por cliente</h2><p class="ph-sub">Periodo '+esc(S.periodo)+' · clic en un cliente para ver su ficha</p></div></div>'+
+      (S.clients.length ? '<div class="donut-grid">'+cards+'</div>' : '<div class="cli-empty">No hay clientes.</div>')+'</div>';
+  }
+  function bindStats(){
+    document.querySelectorAll('.donut-card[data-ficha]').forEach(function(el){
+      el.addEventListener('click', function(){ var c=findClient(+el.dataset.ficha); if(c) openFicha(c); });
+    });
   }
 
   /* ---- Avisos (mail) ---- */
