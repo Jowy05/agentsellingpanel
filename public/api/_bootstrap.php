@@ -32,7 +32,8 @@ function db(): PDO {
       ]);
       $pdo->exec('PRAGMA foreign_keys=ON');
     } else {
-      $dsn = "mysql:host={$d['host']};dbname={$d['name']};charset={$d['charset']}";
+      $cs  = !empty($d['charset']) ? $d['charset'] : 'utf8mb4';   // nunca vacío (evita negociar latin1)
+      $dsn = "mysql:host={$d['host']};dbname={$d['name']};charset={$cs}";
       $pdo = new PDO($dsn, $d['user'], $d['pass'], [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -97,7 +98,10 @@ function audit(?int $uid, string $accion, string $detalle = ''): void {
   } catch (Throwable $e) { /* la auditoría nunca debe romper la petición */ }
 }
 
-// Arranque por defecto
+// Zona horaria fija (periodos/fechas coherentes; el CDR y los avisos dependen del mes correcto).
+date_default_timezone_set(cfg()['app']['timezone'] ?? 'Europe/Madrid');
+
+// Arranque por defecto (en CLI header()/session son inocuos; el cron usa este mismo bootstrap)
 security_headers();
 start_session();
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') { http_response_code(204); exit; }

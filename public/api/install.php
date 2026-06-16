@@ -17,6 +17,8 @@ $sql = (string)file_get_contents($file);
 $sql = preg_replace('/^\s*--.*$/m', '', $sql);                 // quita comentarios de línea
 $stmts = array_filter(array_map('trim', explode(';', $sql)), static fn($s) => $s !== '');
 
+// El esquema es CREATE TABLE IF NOT EXISTS (idempotente, no destructivo); en MySQL el DDL hace auto-commit,
+// así que si fallara a mitad basta con volver a llamar (las tablas ya creadas se saltan).
 $pdo = db();
 $ok = 0; $err = [];
 foreach ($stmts as $s) {
@@ -29,4 +31,10 @@ try {
   $t = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
   echo "Tablas: " . implode(', ', $t) . "\n";
 } catch (Throwable $e) { /* no crítico */ }
-echo "\n⚠ BORRA api/install.php del servidor ahora (ya no hace falta).\n";
+
+// Auto-borrado: si no hubo errores, este instalador se elimina solo (no deja superficie de ataque).
+if (!$err && @unlink(__FILE__)) {
+  echo "\n✓ Esquema aplicado. install.php se ha AUTO-BORRADO del servidor.\n";
+} else {
+  echo "\n⚠ BORRA api/install.php manualmente del servidor (no se pudo auto-borrar o hubo errores).\n";
+}

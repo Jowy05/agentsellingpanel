@@ -12,6 +12,7 @@ $GO = $false   # <-- poner a $true SOLO tras revisar
 $cp = "https://conexiatec.com:2083"
 $sh = "C:\Users\Lucia\Documents\WEB CONEXIA\_tooling\deploy\_upload-design-v140.sh"
 $tok = ((Get-Content $sh | Where-Object { $_ -like 'TOKEN=*' } | Select-Object -First 1).Split('"'))[1]
+if ([string]::IsNullOrWhiteSpace($tok)) { throw "No se pudo extraer el TOKEN de cPanel de $sh (revisa el fichero)." }
 $H = @{ Authorization = ("cpanel conexiatec:" + $tok) }
 
 $APP = "C:\Users\Lucia\Documents\Panel-Minutos-App"
@@ -49,6 +50,7 @@ function Upload-Tree($localRoot, $remoteRoot) {
 
 "== SUBIDA ==  GO=$GO"
 "-- secreto (fuera del docroot): sube config.prod.php COMO config.php --"
+if ($GO) { "  AVISO: se sube con overwrite=1 -> SOBRESCRIBE /panel-secret/config.php si ya existe. En un re-deploy, haz copia manual antes (cPanel File Manager) por si tiene secretos vivos distintos." }
 Remote-Mkdir "/" "panel-secret"
 $cfgProd = Join-Path $APP "panel-secret\config.prod.php"
 if (Test-Path $cfgProd) {

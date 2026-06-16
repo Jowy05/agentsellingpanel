@@ -19,6 +19,13 @@ if (!$isCli) {
   }
 }
 
+// Lock anti-reentrada: si ya hay un cron midiendo, salir (evita solapar y saturar el PBX).
+$lock = @fopen(sys_get_temp_dir() . '/cxpanel_cron.lock', 'c');
+if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
+  if ($isCli) { echo "otro cron en curso; salgo.\n"; exit; }
+  header('Content-Type: application/json'); echo json_encode(['ok' => true, 'skip' => 'locked']); exit;
+}
+
 try {
   $r = run_metering(0, false, 0);   // todos los clientes, medición completa, usuario = sistema
 } catch (Throwable $e) {

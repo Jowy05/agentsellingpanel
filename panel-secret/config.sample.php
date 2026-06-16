@@ -18,6 +18,7 @@ return [
   'app' => [
     'env'            => 'prod',
     'allowed_origin' => 'https://agentsellingpanel.conexiatec.com',
+    'timezone'       => 'Europe/Madrid',
     'session_name'   => 'cxpanel',
     'totp_issuer'    => 'Conexia Panel',
     'cdr_date_fmt'   => 'M-d-Y',

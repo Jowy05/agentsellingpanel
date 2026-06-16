@@ -8,6 +8,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     json_out(['error' => 'metodo_no_permitido'], 405);
 }
 
+// Token obligatorio (cierra la ventana de toma de control del primer admin entre el deploy y el seed).
+$cfgTok = (string)(cfg()['app']['cron_token'] ?? '');
+$given  = (string)($_SERVER['HTTP_X_INSTALL_TOKEN'] ?? '');
+if ($cfgTok === '' || !hash_equals($cfgTok, $given)) {
+    json_out(['error' => 'forbidden'], 403);
+}
+
 // Inicialización de un solo uso: si ya existe cualquier usuario, no se permite
 $total = (int) db()->query('SELECT COUNT(*) FROM usuarios')->fetchColumn();
 if ($total > 0) {
