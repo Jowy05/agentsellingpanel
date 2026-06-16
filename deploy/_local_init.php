@@ -3,9 +3,12 @@
 $dbPath = 'C:/Users/Lucia/Documents/Panel-Minutos-App/.localtools/panel.sqlite';
 $schema = 'C:/Users/Lucia/Documents/Panel-Minutos-App/public/api/schema.sqlite.sql';
 
-if (file_exists($dbPath)) { unlink($dbPath); }
 $pdo = new PDO('sqlite:' . $dbPath);
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+// Borra y recrea (el unlink falla en Windows si el server tiene el fichero abierto).
+foreach (['auditoria','consumo','codigos_recuperacion','clientes','usuarios'] as $t) {
+  $pdo->exec("DROP TABLE IF EXISTS $t");
+}
 $sql = file_get_contents($schema);
 foreach (array_filter(array_map('trim', explode(';', $sql))) as $stmt) {
   if ($stmt !== '' && stripos($stmt, 'PRAGMA') !== 0) { $pdo->exec($stmt); }

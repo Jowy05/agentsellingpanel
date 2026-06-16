@@ -107,7 +107,7 @@ function recoger_campos(array $in, bool $obligatorios): array
     // Campos de texto admitidos (lista blanca: evita asignación masiva de id, slug, creado...).
     $textos = [
         'nombre', 'correo', 'sector', 'plan', 'alta', 'tenant',
-        'ddi', 'desvio_100', 'ivr_normal', 'ivr_corte', 'did_dest_backup',
+        'ddi', 'desvio_100',
     ];
     foreach ($textos as $c) {
         if (array_key_exists($c, $in)) {
@@ -185,7 +185,7 @@ switch ($action) {
         $periodo = date('Y-m');
         $sql = 'SELECT c.id, c.slug, c.nombre, c.correo, c.sector, c.plan,
                        c.minutos_contratados, c.alta, c.tenant, c.ddi,
-                       c.desvio_100, c.ivr_normal, c.ivr_corte, c.did_dest_backup,
+                       c.desvio_100, c.did_dest_backup,
                        c.estado_desvio, c.creado, c.actualizado,
                        COALESCE(co.minutos_usados, 0) AS minutos_usados
                 FROM clientes c
@@ -226,7 +226,7 @@ switch ($action) {
         $periodo = date('Y-m');
         $sql = 'SELECT c.id, c.slug, c.nombre, c.correo, c.sector, c.plan,
                        c.minutos_contratados, c.alta, c.tenant, c.ddi,
-                       c.desvio_100, c.ivr_normal, c.ivr_corte, c.did_dest_backup,
+                       c.desvio_100, c.did_dest_backup,
                        c.estado_desvio, c.creado, c.actualizado,
                        COALESCE(co.minutos_usados, 0) AS minutos_usados
                 FROM clientes c
@@ -274,10 +274,10 @@ switch ($action) {
 
         $sql = 'INSERT INTO clientes
                    (slug, nombre, correo, sector, plan, minutos_contratados,
-                    alta, tenant, ddi, desvio_100, ivr_normal, ivr_corte,
-                    did_dest_backup, estado_desvio, creado, actualizado)
+                    alta, tenant, ddi, desvio_100,
+                    estado_desvio, creado, actualizado)
                 VALUES
-                   (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())';
+                   (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())';
         try {
             $stmt = db()->prepare($sql);
             $stmt->execute([
@@ -291,9 +291,6 @@ switch ($action) {
                 $datos['tenant']   ?? null,
                 $datos['ddi']      ?? null,
                 $datos['desvio_100'] ?? null,
-                $datos['ivr_normal'] ?? null,
-                $datos['ivr_corte']  ?? null,
-                $datos['did_dest_backup'] ?? null,
                 $estadoDesvio,
             ]);
         } catch (PDOException $e) {

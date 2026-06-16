@@ -14,7 +14,7 @@ require __DIR__ . '/lib/pbx.php';
 if (!function_exists('construir_params_did_edit')) {
   function construir_params_did_edit(string $did, string $dest): array {
     // 'did'  -> numero/identificador del DID a editar
-    // 'dest' -> destino al que apuntar (IVR de corte, IVR normal o destino previo)
+    // 'dest' -> destino al que apuntar (desvío al 100% o destino original guardado)
     return [
       'did'         => $did,
       'destination' => $dest,
@@ -66,7 +66,7 @@ if ($clientId <= 0 || !in_array($action, ['cut', 'restore'], true)) {
 }
 
 // Carga el cliente (sentencia preparada, nunca concatenamos entrada).
-$st = db()->prepare('SELECT id, slug, nombre, ddi, ivr_corte, ivr_normal, did_dest_backup, estado_desvio
+$st = db()->prepare('SELECT id, slug, nombre, ddi, desvio_100, did_dest_backup, estado_desvio
                      FROM clientes WHERE id = ?');
 $st->execute([$clientId]);
 $cli = $st->fetch();
@@ -81,9 +81,9 @@ if ($did === '') {
 }
 
 if ($action === 'cut') {
-  $destDespues = trim((string)($cli['ivr_corte'] ?? ''));
+  $destDespues = trim((string)($cli['desvio_100'] ?? ''));
   if ($destDespues === '') {
-    json_out(['error' => 'cliente_sin_ivr_corte'], 422);
+    json_out(['error' => 'cliente_sin_desvio'], 422);
   }
 
   // Lee el destino actual del DID para poder restaurarlo despues.
@@ -91,8 +91,8 @@ if ($action === 'cut') {
 
   // Guarda el backup del destino actual SOLO si:
   //  - lo hemos podido leer, y
-  //  - no coincide ya con el IVR de corte (evita perder el backup real si se
-  //    pulsa 'cut' dos veces: en el segundo corte el "actual" ya seria ivr_corte).
+  //  - no coincide ya con el destino de desvío (evita perder el backup real si se
+  //    pulsa 'cut' dos veces: en el segundo corte el "actual" ya seria el destino de desvío).
   if ($destAntes !== null && $destAntes !== '' && $destAntes !== $destDespues) {
     db()->prepare('UPDATE clientes SET did_dest_backup = ?, actualizado = NOW() WHERE id = ?')
         ->execute([$destAntes, $clientId]);
@@ -121,12 +121,8 @@ if ($action === 'cut') {
 }
 
 // action === 'restore'
-$destAntes = trim((string)($cli['ivr_corte'] ?? ''));   // destino esperado mientras estaba cortado
-$backup    = trim((string)($cli['did_dest_backup'] ?? ''));
-$normal    = trim((string)($cli['ivr_normal'] ?? ''));
-
-// Vuelve al destino previo guardado; si esta vacio, al IVR normal.
-$destDespues = $backup !== '' ? $backup : $normal;
+$destAntes   = trim((string)($cli['desvio_100'] ?? ''));      // destino mientras estaba cortado
+$destDespues = trim((string)($cli['did_dest_backup'] ?? '')); // destino original del DID (el agente), guardado al cortar
 
 if ($destDespues === '') {
   json_out(['error' => 'sin_destino_restaurar'], 422);

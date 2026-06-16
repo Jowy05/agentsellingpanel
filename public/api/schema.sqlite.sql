@@ -36,8 +36,6 @@ CREATE TABLE IF NOT EXISTS clientes (
   tenant              TEXT,
   ddi                 TEXT,
   desvio_100          TEXT,
-  ivr_normal          TEXT,
-  ivr_corte           TEXT,
   did_dest_backup     TEXT,
   estado_desvio       TEXT NOT NULL DEFAULT 'normal',
   creado              TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,

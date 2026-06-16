@@ -35,10 +35,8 @@ CREATE TABLE IF NOT EXISTS clientes (
   alta                VARCHAR(40) DEFAULT NULL,
   tenant              VARCHAR(40) DEFAULT NULL,       -- server PBX (p.ej. 18)
   ddi                 VARCHAR(60) DEFAULT NULL,       -- DID del agente
-  desvio_100          VARCHAR(190) DEFAULT NULL,      -- descripción del destino al 100%
-  ivr_normal          VARCHAR(60) DEFAULT NULL,       -- IVR destino normal del DID
-  ivr_corte           VARCHAR(60) DEFAULT NULL,       -- IVR de respaldo al 100%
-  did_dest_backup     VARCHAR(190) DEFAULT NULL,      -- destino original guardado antes del desvío
+  desvio_100          VARCHAR(190) DEFAULT NULL,      -- destino al 100%: IVR o número al que se desvía el DID
+  did_dest_backup     VARCHAR(190) DEFAULT NULL,      -- destino original del DID (el agente), guardado antes del desvío para restaurar
   estado_desvio       ENUM('normal','cortado') NOT NULL DEFAULT 'normal',
   creado              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   actualizado         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP

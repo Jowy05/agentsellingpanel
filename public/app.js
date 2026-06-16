@@ -44,7 +44,7 @@
 
   function renderLogin(){
     authShell(
-      '<h1 class="auth-title">Panel de minutos · Agente IA</h1>'+
+      '<h1 class="auth-title">Panel Agentes Voz IA</h1>'+
       '<p class="auth-sub">Acceso del equipo técnico de Conexia</p>'+
       '<form id="f-login">'+
         '<div class="field"><label>Email</label><input class="field-input" type="email" name="email" autocomplete="username" required></div>'+
@@ -138,7 +138,7 @@
     app.innerHTML =
       '<div class="app">'+
       '<div class="topbar"><div class="brand"><div class="logo"></div><div class="divider"></div>'+
-        '<div class="titles"><div class="kicker">Agente de Voz IA</div><h1>Panel de minutos</h1></div></div>'+
+        '<div class="titles"><div class="kicker">Conexia</div><h1>Panel Agentes Voz IA</h1></div></div>'+
         '<div class="topbar-right"><span class="userchip">'+esc(S.user.nombre)+' · '+esc(S.user.rol)+'</span>'+
         '<button class="theme-toggle" id="logout">Salir</button></div></div>'+
       '<div class="nav"><div class="nav-segmented">'+views.map(function(v){return '<button class="seg'+(v[0]===S.view?' active':'')+'" data-v="'+v[0]+'">'+v[1]+'</button>';}).join('')+'</div></div>'+
@@ -189,7 +189,7 @@
   function findClient(id){ return S.clients.filter(function(c){return c.id===id;})[0]; }
 
   function openClientForm(c){
-    var f = c || { nombre:'',correo:'',sector:'',plan:'',minutos_contratados:0,alta:'',tenant:'',ddi:'',desvio_100:'',ivr_normal:'',ivr_corte:'' };
+    var f = c || { nombre:'',correo:'',sector:'',plan:'',minutos_contratados:0,alta:'',tenant:'',ddi:'',desvio_100:'' };
     function fld(label,name,type,ph,span){ return '<div class="field'+(span?' span-2':'')+'"><label>'+label+'</label><input class="field-input" name="'+name+'" '+(type==='number'?'type="number" min="0"':'')+' value="'+esc(f[name])+'" placeholder="'+esc(ph||'')+'"></div>'; }
     var html='<div class="modal-scrim" id="scrim"><div class="modal"><div class="modal-head"><div>'+
       '<h3 class="mh-name">'+(c?'Editar cliente':'Nuevo cliente')+'</h3><div class="mh-meta">Se guarda en el servidor</div></div>'+
@@ -202,9 +202,7 @@
       fld('Alta','alta','text','Ej. Jun 2026')+
       fld('DDI del agente','ddi','text','Número de entrada')+
       fld('Tenant (PBXware)','tenant','text','Ej. 18')+
-      fld('IVR normal del DID','ivr_normal','text','Destino habitual (IVR)')+
-      fld('IVR de corte (al 100%)','ivr_corte','text','Destino de respaldo (IVR)')+
-      fld('Desvío al 100% (nota)','desvio_100','text','Descripción del destino',true)+
+      fld('Desvío al 100% (IVR/número destino)','desvio_100','text','Destino al llegar al 100%')+
       '</div><div id="cli-err"></div><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">'+
       '<button type="button" class="btn btn-ghost" id="cancel">Cancelar</button>'+
       '<button type="submit" class="btn btn-primary">Guardar</button></div></form></div></div></div>';
@@ -218,7 +216,7 @@
       e.preventDefault();
       var fd=new FormData(e.target), o={action: c?'update':'create'};
       if(c) o.id=c.id;
-      ['nombre','correo','sector','plan','alta','ddi','tenant','ivr_normal','ivr_corte','desvio_100'].forEach(function(k){ o[k]=(fd.get(k)||'').trim(); });
+      ['nombre','correo','sector','plan','alta','ddi','tenant','desvio_100'].forEach(function(k){ o[k]=(fd.get(k)||'').trim(); });
       o.minutos_contratados = parseInt(fd.get('minutos_contratados')||'0',10)||0;
       if(!o.nombre){ showErr('cli-err','El nombre es obligatorio.'); return; }
       var r=await api('clients.php', o);
@@ -232,7 +230,7 @@
     var pct=c.porcentaje, restantes=c.minutos_contratados - c.minutos_usados;
     var divert = isAdmin() ? (
       '<div class="modal-agents"><div class="ma-title">Desvío del DID (PBX)</div>'+
-      '<div class="cut-hint">DDI '+esc(c.ddi||'—')+' · normal: IVR '+esc(c.ivr_normal||'—')+' · corte: IVR '+esc(c.ivr_corte||'—')+'. Estado: <b>'+esc(c.estado_desvio||'normal')+'</b></div>'+
+      '<div class="cut-hint">DDI '+esc(c.ddi||'—')+' · al 100% se desvía a: <b>'+esc(c.desvio_100||'—')+'</b>. Estado: <b>'+esc(c.estado_desvio||'normal')+'</b></div>'+
       '<div style="display:flex;gap:10px;margin-top:10px">'+
         '<button class="btn btn-ghost" id="do-cut">Cortar (desviar a IVR de corte)</button>'+
         '<button class="btn btn-ghost" id="do-restore">Restaurar</button></div>'+
