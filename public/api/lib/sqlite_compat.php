@@ -13,6 +13,8 @@ function sqlite_sql(string $sql): string {
   );
   // NOW()  ->  CURRENT_TIMESTAMP
   $sql = preg_replace('/\bNOW\(\)/i', 'CURRENT_TIMESTAMP', $sql);
+  // INSERT IGNORE INTO  ->  INSERT OR IGNORE INTO
+  $sql = preg_replace('/INSERT\s+IGNORE\s+INTO/i', 'INSERT OR IGNORE INTO', $sql);
   // UPSERT MySQL -> SQLite (único upsert: tabla consumo, clave única cliente_id+periodo)
   if (stripos($sql, 'ON DUPLICATE KEY UPDATE') !== false) {
     $sql = preg_replace('/\bVALUES\(\s*(\w+)\s*\)/i', 'excluded.$1', $sql);

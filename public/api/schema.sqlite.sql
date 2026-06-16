@@ -54,6 +54,22 @@ CREATE TABLE IF NOT EXISTS consumo (
   FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS agentes (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  cliente_id      INTEGER NOT NULL,
+  uuid            TEXT,                     -- id del agente (destino UUID del DID); NULL si manual
+  nombre          TEXT NOT NULL,
+  dial_number     TEXT,                     -- número interno del agente (opcional)
+  ddi             TEXT NOT NULL,            -- número público; por aquí se mide y se desvía
+  ivr_corte       TEXT,                     -- IVR de corte de ESTE agente; NULL = usa el del cliente
+  did_dest_backup TEXT,
+  estado_desvio   TEXT NOT NULL DEFAULT 'normal',
+  creado          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (cliente_id, ddi),
+  FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS auditoria (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   usuario_id INTEGER DEFAULT NULL,

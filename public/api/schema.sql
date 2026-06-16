@@ -54,6 +54,22 @@ CREATE TABLE IF NOT EXISTS consumo (
   FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS agentes (
+  id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  cliente_id      INT UNSIGNED NOT NULL,
+  uuid            VARCHAR(64) DEFAULT NULL,        -- id del agente de voz (destino UUID del DID); NULL si manual
+  nombre          VARCHAR(190) NOT NULL,
+  dial_number     VARCHAR(40) DEFAULT NULL,        -- número interno del agente (opcional)
+  ddi             VARCHAR(60) NOT NULL,            -- número público; por aquí se mide y se desvía
+  ivr_corte       VARCHAR(190) DEFAULT NULL,       -- IVR/destino de corte de ESTE agente; NULL = usa el del cliente
+  did_dest_backup VARCHAR(190) DEFAULT NULL,       -- destino original del DID, guardado al cortar
+  estado_desvio   ENUM('normal','cortado') NOT NULL DEFAULT 'normal',
+  creado          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_cli_ddi (cliente_id, ddi),
+  FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS auditoria (
   id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   usuario_id INT UNSIGNED DEFAULT NULL,
