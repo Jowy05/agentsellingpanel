@@ -30,6 +30,8 @@ function aviso_consumo_html(string $nombre, int $nivel, int $usado, int $contr):
   $rest   = max(0, $contr - $usado);
   $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
   $n = $e($nombre);
+  $azul = '#1489cc';   // mismo azul que el botón "Añadir cliente" del panel
+  $logo = 'https://agentsellingpanel.conexiatec.com/assets/conexia-logo.png';   // se ve al desplegar el panel
 
   if ($nivel >= 100) {
     $subject = "Servicio desviado · {$nombre} (100% de minutos)";
@@ -51,9 +53,11 @@ function aviso_consumo_html(string $nombre, int $nivel, int $usado, int $contr):
   '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#eef2f1;margin:0;padding:24px 0">'
   . '<tr><td align="center">'
   . '<table role="presentation" cellpadding="0" cellspacing="0" width="600" style="max-width:600px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden;font-family:Arial,Helvetica,sans-serif">'
-  .   '<tr><td style="background:#0f2e2b;padding:22px 30px">'
-  .     '<span style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:.3px">Conexia</span>'
-  .     '<span style="color:#6fd0bf;font-size:13px"> &nbsp;&middot;&nbsp; Agente de Voz IA</span>'
+  .   '<tr><td style="background:' . $azul . ';padding:18px 28px">'
+  .     '<table role="presentation" cellpadding="0" cellspacing="0"><tr>'
+  .       '<td style="background:#ffffff;border-radius:8px;padding:7px 12px"><img src="' . $logo . '" alt="Conexia" height="22" style="display:block;height:22px;border:0"></td>'
+  .       '<td style="padding-left:14px;color:#eaf4fb;font-size:13px;font-weight:700">Agente de Voz IA</td>'
+  .     '</tr></table>'
   .   '</td></tr>'
   .   '<tr><td style="padding:28px 30px 6px">'
   .     '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:' . $soft . ';border-radius:10px"><tr><td style="padding:16px 18px">'
