@@ -48,10 +48,5 @@
 .notif-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
 .notif-item:last-child { border-bottom: none; }
 .notif-empty { padding: 18px 14px; color: var(--text-3); font-size: 13px; text-align: center; }
-
-@keyframes cxblinkWarn   { 0%,49% { color: var(--c-warn);   } 50%,100% { color: var(--text); } }
-@keyframes cxblinkDanger { 0%,49% { color: var(--c-danger); } 50%,100% { color: var(--text); } }
-#app-name.blink-warn   { animation: cxblinkWarn 1s steps(1,end) infinite; }
-#app-name.blink-danger { animation: cxblinkDanger .8s steps(1,end) infinite; }
 .empty-note { padding: 40px 20px; text-align: center; color: var(--text-3); }
 @media (max-width: 720px) { .form-grid { grid-template-columns: 1fr; } .kpi-row { grid-template-columns: 1fr 1fr; } }

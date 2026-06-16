@@ -8,6 +8,7 @@
   var ACK_KEY = 'cx_alerts_ack';
   var DOC_TITLE = 'Panel Agentes Voz IA — Conexia';
   var BELL_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20a2 2 0 0 0 4 0"/></svg>';
+  var titleTimer = null;
 
   async function api(path, body){
     var opt = { method: body ? 'POST':'GET', credentials:'same-origin', headers:{} };
@@ -43,7 +44,7 @@
   }
 
   /* ============ LOGIN ============ */
-  function authShell(inner){ document.title = DOC_TITLE; app.innerHTML = '<div class="auth-wrap"><div class="card auth-card" style="padding:30px 28px"><div class="auth-logo"></div>'+inner+'</div></div>'; }
+  function authShell(inner){ stopTitleBlink(); app.innerHTML = '<div class="auth-wrap"><div class="card auth-card" style="padding:30px 28px"><div class="auth-logo"></div>'+inner+'</div></div>'; }
 
   function renderLogin(){
     authShell(
@@ -165,16 +166,24 @@
   function alertsAcked(sig){ try { return localStorage.getItem(ACK_KEY) === sig; } catch(e){ return false; } }
   function ackAlerts(sig){ try { localStorage.setItem(ACK_KEY, sig); } catch(e){} }
 
+  function stopTitleBlink(){ if (titleTimer){ clearInterval(titleTimer); titleTimer = null; } document.title = DOC_TITLE; }
+
   function updateAlerts(){
     var a = computeAlerts();
     var unacked = a.sig !== '' && !alertsAcked(a.sig);
-    var name = document.getElementById('app-name');
-    if (name){ name.classList.remove('blink-warn','blink-danger'); if (unacked && a.level) name.classList.add(a.level==='danger'?'blink-danger':'blink-warn'); }
     var btn = document.getElementById('notif');
     if (btn){ btn.classList.remove('has-alert','warn','danger'); if (a.list.length) btn.classList.add('has-alert', a.level); }
     var badge = document.getElementById('notif-badge');
     if (badge){ badge.textContent = a.list.length ? String(a.list.length) : ''; badge.className = 'notif-badge' + (a.list.length ? (' show' + (a.level==='warn' ? ' warn' : '')) : ''); }
-    document.title = (unacked && a.list.length ? '('+a.list.length+') ' : '') + DOC_TITLE;
+    // Parpadeo en el TÍTULO DE LA PESTAÑA: el "(N)" aparece y desaparece.
+    if (titleTimer){ clearInterval(titleTimer); titleTimer = null; }
+    if (unacked && a.list.length){
+      var pre = '(' + a.list.length + ') ';
+      var on = true; document.title = pre + DOC_TITLE;
+      titleTimer = setInterval(function(){ on = !on; document.title = (on ? pre : '') + DOC_TITLE; }, 900);
+    } else {
+      document.title = DOC_TITLE;
+    }
     return a;
   }
 
@@ -270,7 +279,7 @@
       o.minutos_contratados = parseInt(fd.get('minutos_contratados')||'0',10)||0;
       if(!o.nombre){ showErr('cli-err','El nombre es obligatorio.'); return; }
       var r=await api('clients.php', o);
-      if(r.status===200 && (r.data.ok || r.data.id)){ close(); toast('Cliente guardado'); await reloadClients(); renderView(); }
+      if(r.data && (r.data.ok || r.data.id)){ close(); toast('Cliente guardado'); await reloadClients(); renderView(); }
       else showErr('cli-err', emsg(r.data));
     });
   }
@@ -432,7 +441,7 @@
     document.getElementById('f-user').addEventListener('submit', async function(e){
       e.preventDefault(); var fd=new FormData(e.target);
       var r=await api('users.php',{action:'create', nombre:(fd.get('nombre')||'').trim(), email:(fd.get('email')||'').trim(), rol:fd.get('rol')});
-      if(r.status===200 && r.data.tmp_pass){ close(); alert('Miembro creado.\n\nContraseña temporal (cópiala y entrégala):\n\n'+r.data.tmp_pass); var v=document.getElementById('view'); viewEquipo(v); }
+      if(r.data && r.data.tmp_pass){ close(); alert('Miembro creado.\n\nContraseña temporal (cópiala y entrégala):\n\n'+r.data.tmp_pass); var v=document.getElementById('view'); viewEquipo(v); }
       else showErr('u-err', emsg(r.data));
     });
   }
