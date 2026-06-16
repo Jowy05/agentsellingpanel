@@ -15,8 +15,10 @@ $in       = body_json();
 $clientId = isset($in['client_id']) ? (int)$in['client_id'] : 0;
 
 $periodo = date('Y-m');
-$inicio  = date('M-d-Y', strtotime(date('Y-m-01')));  // primer día del mes en curso
-$fin     = date('M-d-Y');                               // hoy
+$day1    = date('M-d-Y', strtotime(date('Y-m-01')));  // primer día del mes en curso
+$hoy     = date('M-d-Y');                               // hoy
+$ayer    = date('M-d-Y', strtotime('-1 day'));         // ayer
+$quick   = (($in['scope'] ?? '') === 'today');         // medición RÁPIDA: solo recalcula hoy (1 consulta/agente)
 
 $stc = db()->prepare('SELECT id, nombre, tenant, minutos_contratados, desvio_100 FROM clientes' . ($clientId ? ' WHERE id = ?' : ''));
 $stc->execute($clientId ? [$clientId] : []);
@@ -24,11 +26,19 @@ $clientes = $stc->fetchAll();
 
 $autoCut = !empty(cfg()['app']['auto_cut_100']);   // auto-corte al 100% (gateado en config hasta validar did.edit)
 
-$upsert = db()->prepare(
-    'INSERT INTO consumo (agente_id, periodo, minutos_usados, actualizado)
-          VALUES (?, ?, ?, NOW())
+// Upsert COMPLETO: fija minutos_usados Y base_mes (= minutos del mes hasta AYER).
+$upFull = db()->prepare(
+    'INSERT INTO consumo (agente_id, periodo, minutos_usados, base_mes, actualizado)
+          VALUES (?, ?, ?, ?, NOW())
+     ON DUPLICATE KEY UPDATE minutos_usados = VALUES(minutos_usados), base_mes = VALUES(base_mes), actualizado = NOW()'
+);
+// Upsert RÁPIDO: solo minutos_usados (mantiene el base_mes ya guardado).
+$upQuick = db()->prepare(
+    'INSERT INTO consumo (agente_id, periodo, minutos_usados, base_mes, actualizado)
+          VALUES (?, ?, ?, ?, NOW())
      ON DUPLICATE KEY UPDATE minutos_usados = VALUES(minutos_usados), actualizado = NOW()'
 );
+$baseStmt = db()->prepare('SELECT base_mes FROM consumo WHERE agente_id = ? AND periodo = ?');
 
 $resumen = [];
 foreach ($clientes as $cli) {
@@ -48,13 +58,35 @@ foreach ($clientes as $cli) {
         if ($needle === '') $needle = trim((string)($a['dial_number'] ?? ''));
         if ($needle === '') { $detalle[] = ['agente' => $a['nombre'], 'minutos' => 0, 'nota' => 'sin DDI ni dial']; continue; }
 
-        $m   = pbx_cdr_minutos($needle, $inicio, $fin, $server);
-        $min = !empty($m['ok']) ? (int)$m['minutos'] : 0;
-        $upsert->execute([(int)$a['id'], $periodo, $min]);
+        // Hoy es el único día que cambia → siempre se recalcula (1 consulta).
+        $mh     = pbx_cdr_minutos($needle, $hoy, $hoy, $server);
+        $hoyMin = !empty($mh['ok']) ? (int)$mh['minutos'] : 0;
+
+        if ($quick) {
+            $baseStmt->execute([(int)$a['id'], $periodo]);
+            $base = $baseStmt->fetchColumn();
+            if ($base === false) {
+                // Sin base previa: calcula el mes hasta ayer una vez y la guarda.
+                $mp   = pbx_cdr_minutos($needle, $day1, $ayer, $server);
+                $base = !empty($mp['ok']) ? (int)$mp['minutos'] : 0;
+                $min  = $base + $hoyMin;
+                $upFull->execute([(int)$a['id'], $periodo, $min, $base]);
+            } else {
+                $base = (int)$base;
+                $min  = $base + $hoyMin;
+                $upQuick->execute([(int)$a['id'], $periodo, $min, $base]);
+            }
+        } else {
+            // Completo: re-mide el mes hasta ayer + hoy.
+            $mp   = pbx_cdr_minutos($needle, $day1, $ayer, $server);
+            $base = !empty($mp['ok']) ? (int)$mp['minutos'] : 0;
+            $min  = $base + $hoyMin;
+            $upFull->execute([(int)$a['id'], $periodo, $min, $base]);
+        }
         $total += $min;
         $detalle[] = ['agente' => $a['nombre'], 'minutos' => $min];
     }
-    audit($auth['id'], 'metering', 'Cliente #' . $cli['id'] . ': ' . $total . ' min (' . count($agentes) . ' agentes)');
+    audit($auth['id'], $quick ? 'metering_rapido' : 'metering', 'Cliente #' . $cli['id'] . ': ' . $total . ' min (' . count($agentes) . ' agentes)');
 
     // Auto-corte / auto-reactivación según el umbral del 100%:
     //  - total >= contratado  → cortar cada agente con DID (desviar a su IVR de corte / el del cliente)

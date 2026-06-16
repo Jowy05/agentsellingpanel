@@ -136,8 +136,8 @@
   }
   function isAdmin(){ return S.user && S.user.rol==='admin'; }
 
-  /* ---- Auto-refresh: refresca la pantalla cada 10s y re-mide el CDR cada 60s ---- */
-  var AUTO={display:null, meter:null, metering:false}, lastSig='';
+  /* ---- Auto-refresh: pantalla ~2s, medición RÁPIDA (solo hoy) ~3s, repaso completo del mes ~2min ---- */
+  var AUTO={display:null, quick:null, full:null, metering:false}, lastSig='';
   function modalOpen(){ return !!document.querySelector('.modal-scrim'); }
   function refreshableView(){ return S.view==='stats'||S.view==='clientes'; }
   function clientsSig(){ return S.clients.map(function(c){return c.id+':'+c.minutos_usados+':'+c.porcentaje;}).join('|'); }
@@ -148,18 +148,23 @@
     var sig=clientsSig();
     if(sig!==lastSig){ lastSig=sig; if(!modalOpen() && refreshableView()) renderView(); }
   }
-  async function autoMeter(){
-    if(document.hidden || AUTO.metering || !isAdmin()) return;
+  async function autoMeter(scope){
+    if(document.hidden || AUTO.metering || !isAdmin()) return;   // solo admin; sin solapar (rápida vs completa comparten cerrojo)
     AUTO.metering=true;
     try{
-      var r=await api('metering.php',{});
+      var r=await api('metering.php', scope==='today'?{scope:'today'}:{});
       if(r.status===401){ stopAuto(); renderLogin(); return; }
       await reloadClients(); updateAlerts(); lastSig=clientsSig();
       if(!modalOpen() && refreshableView()) renderView();
     } finally { AUTO.metering=false; }
   }
-  function startAuto(){ stopAuto(); lastSig=clientsSig(); AUTO.display=setInterval(autoTick,5000); AUTO.meter=setInterval(autoMeter,60000); }
-  function stopAuto(){ if(AUTO.display) clearInterval(AUTO.display); if(AUTO.meter) clearInterval(AUTO.meter); AUTO.display=AUTO.meter=null; }
+  function startAuto(){
+    stopAuto(); lastSig=clientsSig();
+    AUTO.display=setInterval(autoTick, 2000);
+    AUTO.quick=setInterval(function(){ autoMeter('today'); }, 3000);    // medición continua del día (1 consulta/agente)
+    AUTO.full=setInterval(function(){ autoMeter('month'); }, 120000);   // repaso completo del mes de fondo
+  }
+  function stopAuto(){ ['display','quick','full'].forEach(function(k){ if(AUTO[k]){ clearInterval(AUTO[k]); AUTO[k]=null; } }); }
 
   function renderPanel(){
     var views=[['clientes','Clientes'],['stats','Stats'],['mail','Avisos']];

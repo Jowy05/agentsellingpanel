@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS consumo (
   agente_id      INT UNSIGNED NOT NULL,
   periodo        VARCHAR(7) NOT NULL,
   minutos_usados INT UNSIGNED NOT NULL DEFAULT 0,
+  base_mes       INT UNSIGNED NOT NULL DEFAULT 0,   -- minutos del mes hasta AYER (la medición rápida solo recalcula hoy)
   actualizado    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uniq_agente_periodo (agente_id, periodo),
   FOREIGN KEY (agente_id) REFERENCES agentes(id) ON DELETE CASCADE
