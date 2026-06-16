@@ -187,10 +187,11 @@ switch ($action) {
                        c.minutos_contratados, c.alta, c.tenant, c.ddi,
                        c.desvio_100, c.did_dest_backup,
                        c.estado_desvio, c.creado, c.actualizado,
-                       COALESCE(co.minutos_usados, 0) AS minutos_usados
+                       COALESCE((SELECT SUM(co.minutos_usados) FROM agentes a
+                                 JOIN consumo co ON co.agente_id = a.id AND co.periodo = ?
+                                 WHERE a.cliente_id = c.id), 0) AS minutos_usados,
+                       (SELECT COUNT(*) FROM agentes a2 WHERE a2.cliente_id = c.id) AS num_agentes
                 FROM clientes c
-                LEFT JOIN consumo co
-                       ON co.cliente_id = c.id AND co.periodo = ?
                 ORDER BY c.nombre ASC';
         $stmt = db()->prepare($sql);
         $stmt->execute([$periodo]);
@@ -228,10 +229,11 @@ switch ($action) {
                        c.minutos_contratados, c.alta, c.tenant, c.ddi,
                        c.desvio_100, c.did_dest_backup,
                        c.estado_desvio, c.creado, c.actualizado,
-                       COALESCE(co.minutos_usados, 0) AS minutos_usados
+                       COALESCE((SELECT SUM(co.minutos_usados) FROM agentes a
+                                 JOIN consumo co ON co.agente_id = a.id AND co.periodo = ?
+                                 WHERE a.cliente_id = c.id), 0) AS minutos_usados,
+                       (SELECT COUNT(*) FROM agentes a2 WHERE a2.cliente_id = c.id) AS num_agentes
                 FROM clientes c
-                LEFT JOIN consumo co
-                       ON co.cliente_id = c.id AND co.periodo = ?
                 WHERE c.id = ?
                 LIMIT 1';
         $stmt = db()->prepare($sql);

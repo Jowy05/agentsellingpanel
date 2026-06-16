@@ -257,11 +257,10 @@
       fld('Correo','correo','text','contacto@cliente.com')+
       fld('Sector','sector','text','Ej. Salud')+
       fld('Plan','plan','text','Ej. Plan Recepción 500')+
-      fld('Minutos contratados','minutos_contratados','number','')+
+      fld('Minutos contratados (total)','minutos_contratados','number','')+
       fld('Alta','alta','text','Ej. Jun 2026')+
-      fld('DDI del agente','ddi','text','Número de entrada')+
-      fld('Tenant (PBXware)','tenant','text','Ej. 18')+
-      fld('Desvío al 100% (IVR/número destino)','desvio_100','text','Destino al llegar al 100%')+
+      fld('Tenant (código, p.ej. 216)','tenant','text','Código de tenant en la centralita')+
+      fld('IVR de corte por defecto','desvio_100','text','Se usa si un agente no tiene el suyo',true)+
       '</div><div id="cli-err"></div><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">'+
       '<button type="button" class="btn btn-ghost" id="cancel">Cancelar</button>'+
       '<button type="submit" class="btn btn-primary">Guardar</button></div></form></div></div></div>';
@@ -275,7 +274,7 @@
       e.preventDefault();
       var fd=new FormData(e.target), o={action: c?'update':'create'};
       if(c) o.id=c.id;
-      ['nombre','correo','sector','plan','alta','ddi','tenant','desvio_100'].forEach(function(k){ o[k]=(fd.get(k)||'').trim(); });
+      ['nombre','correo','sector','plan','alta','tenant','desvio_100'].forEach(function(k){ o[k]=(fd.get(k)||'').trim(); });
       o.minutos_contratados = parseInt(fd.get('minutos_contratados')||'0',10)||0;
       if(!o.nombre){ showErr('cli-err','El nombre es obligatorio.'); return; }
       var r=await api('clients.php', o);
@@ -297,7 +296,7 @@
       '<div class="kv-grid"><div class="kv"><div class="k">Minutos restantes</div><div class="v">'+restantes+' min</div></div>'+
       '<div class="kv"><div class="k">Correo</div><div class="v" style="font-size:13px;font-family:var(--font-mono)">'+esc(c.correo||'—')+'</div></div>'+
       '<div class="kv"><div class="k">Tenant</div><div class="v" style="font-family:var(--font-mono)">'+esc(c.tenant||'—')+'</div></div>'+
-      '<div class="kv"><div class="k">DDI</div><div class="v" style="font-family:var(--font-mono)">'+esc(c.ddi||'—')+'</div></div></div>'+
+      '<div class="kv"><div class="k">IVR corte (def.)</div><div class="v" style="font-size:13px">'+esc(c.desvio_100||'—')+'</div></div></div>'+
       agentsSection+'</div></div></div>';
     var wrap=document.createElement('div'); wrap.innerHTML=html; document.body.appendChild(wrap.firstChild);
     var scrim=document.getElementById('scrimf');
@@ -309,26 +308,51 @@
 
   async function loadFichaAgents(c){
     var box=document.getElementById('ficha-agents'); if(!box) return;
+    var admin=isAdmin();
     var r=await api('agents.php',{action:'list',client_id:c.id});
     var ags=(r.data&&r.data.agentes)||[];
     var rows = ags.length ? ags.map(function(a){
+      var cut = a.estado_desvio==='cortado';
+      var divBtn = (admin && a.ddi) ? (cut
+        ? '<button class="btn btn-ghost btn-sm" data-restore="'+a.id+'">Reactivar</button>'
+        : '<button class="btn btn-ghost btn-sm" data-cut="'+a.id+'">Cortar</button>') : '';
       return '<div class="agent-row"><div class="agent-meta"><div>'+
-        '<div class="agent-name">'+esc(a.nombre)+'</div>'+
-        '<div class="agent-sub">DDI '+esc(a.ddi||'—')+(a.dial_number?' · dial '+esc(a.dial_number):'')+' · corte: '+esc(a.ivr_corte||'(def. cliente)')+'</div></div></div>'+
-        '<div class="agent-end"><button class="icon-btn danger" data-delag="'+a.id+'" title="Quitar agente">🗑</button></div></div>';
+        '<div class="agent-name">'+esc(a.nombre)+(cut?' <span class="cut-tag"><span class="sd"></span>Cortado</span>':'')+'</div>'+
+        '<div class="agent-sub">DDI '+esc(a.ddi||'—')+(a.dial_number?' · dial '+esc(a.dial_number):'')+' · corte: '+esc(a.ivr_corte||'(por defecto)')+'</div></div></div>'+
+        '<div class="agent-end"><span class="agent-minutes">'+(a.minutos||0)+'<span class="unit">min</span></span>'+divBtn+
+        '<button class="icon-btn danger" data-delag="'+a.id+'" title="Quitar agente">🗑</button></div></div>';
     }).join('') : '<div class="muted" style="padding:6px 0">Sin agentes. Pulsa «Leer agentes» o «Agregar agente».</div>';
-    box.innerHTML = '<div class="ma-title">Agentes IA</div>'+rows+
+    box.innerHTML = '<div class="ma-title">Agentes IA · consumo del periodo</div>'+rows+
       '<div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">'+
-      '<button class="btn btn-ghost btn-sm" id="ag-read">↻ Leer agentes de la centralita</button>'+
+      (admin?'<button class="btn btn-ghost btn-sm" id="ag-meter">↻ Actualizar consumo</button>':'')+
+      '<button class="btn btn-ghost btn-sm" id="ag-read">Leer agentes</button>'+
       '<button class="btn btn-primary btn-sm" id="ag-add">+ Agregar agente</button></div>'+
-      '<div class="muted" style="margin-top:8px">«Leer» trae los agentes con DID público; el resto se añaden a mano con su dial number.</div>';
+      '<div class="muted" style="margin-top:8px">«Leer agentes» trae los de DID público; el resto se añaden a mano con su dial number. «Actualizar consumo» recalcula los minutos desde el CDR (puede tardar unos segundos).</div>';
     document.getElementById('ag-add').addEventListener('click', function(){ openAgentForm(c.id); });
     document.getElementById('ag-read').addEventListener('click', function(){ readAgents(c.id); });
+    var meterBtn=document.getElementById('ag-meter'); if(meterBtn) meterBtn.addEventListener('click', function(){ refreshConsumo(c.id); });
+    box.querySelectorAll('[data-cut]').forEach(function(b){ b.addEventListener('click', function(){ doDivertAgent(+b.dataset.cut,'cut',c); }); });
+    box.querySelectorAll('[data-restore]').forEach(function(b){ b.addEventListener('click', function(){ doDivertAgent(+b.dataset.restore,'restore',c); }); });
     box.querySelectorAll('[data-delag]').forEach(function(b){ b.addEventListener('click', async function(){
       if(!confirm('¿Quitar este agente?')) return;
       var rr=await api('agents.php',{action:'delete',id:+b.dataset.delag});
       if(rr.data&&rr.data.ok){ toast('Agente quitado'); loadFichaAgents(c); } else toast(emsg(rr.data));
     });});
+  }
+  async function doDivertAgent(agentId, action, c){
+    if(!confirm('Esto cambia el desvío en la CENTRALITA REAL. ¿Continuar?')) return;
+    var r=await api('divert.php',{agent_id:agentId, action:action});
+    if(r.data&&r.data.ok){ toast('Desvío '+(action==='cut'?'aplicado':'restaurado')); loadFichaAgents(c); }
+    else toast('PBX: '+emsg(r.data));
+  }
+  async function refreshConsumo(clientId){
+    toast('Actualizando consumo desde el CDR… puede tardar unos segundos');
+    var r=await api('metering.php',{client_id:clientId});
+    if(!(r.data&&r.data.ok)){ toast(emsg(r.data)); return; }
+    await reloadClients();
+    var scrim=document.getElementById('scrimf'); if(scrim) scrim.remove();
+    var c=findClient(clientId); if(c) openFicha(c);
+    toast('Consumo actualizado');
   }
   async function readAgents(clientId){
     toast('Leyendo agentes de la centralita…');

@@ -84,11 +84,16 @@ switch ($action) {
         break;
     }
 
-    // Listar agentes de un cliente.
+    // Listar agentes de un cliente (con minutos del periodo actual).
     case 'list': {
-        $st = db()->prepare('SELECT id, uuid, nombre, dial_number, ddi, ivr_corte, estado_desvio FROM agentes WHERE cliente_id = ? ORDER BY nombre');
-        $st->execute([(int)($in['client_id'] ?? 0)]);
-        json_out(['agentes' => $st->fetchAll()]);
+        $periodo = date('Y-m');
+        $st = db()->prepare('SELECT a.id, a.uuid, a.nombre, a.dial_number, a.ddi, a.ivr_corte, a.estado_desvio,
+                                    COALESCE(co.minutos_usados, 0) AS minutos
+                             FROM agentes a
+                             LEFT JOIN consumo co ON co.agente_id = a.id AND co.periodo = ?
+                             WHERE a.cliente_id = ? ORDER BY a.nombre');
+        $st->execute([$periodo, (int)($in['client_id'] ?? 0)]);
+        json_out(['agentes' => $st->fetchAll(), 'periodo' => $periodo]);
         break;
     }
 

@@ -18,7 +18,7 @@ function sqlite_sql(string $sql): string {
   // UPSERT MySQL -> SQLite (único upsert: tabla consumo, clave única cliente_id+periodo)
   if (stripos($sql, 'ON DUPLICATE KEY UPDATE') !== false) {
     $sql = preg_replace('/\bVALUES\(\s*(\w+)\s*\)/i', 'excluded.$1', $sql);
-    $sql = preg_replace('/ON DUPLICATE KEY UPDATE/i', 'ON CONFLICT(cliente_id, periodo) DO UPDATE SET', $sql);
+    $sql = preg_replace('/ON DUPLICATE KEY UPDATE/i', 'ON CONFLICT(agente_id, periodo) DO UPDATE SET', $sql);
   }
   return $sql;
 }

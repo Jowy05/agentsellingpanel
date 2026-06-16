@@ -42,32 +42,31 @@ CREATE TABLE IF NOT EXISTS clientes (
   actualizado         TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS consumo (
-  id             INTEGER PRIMARY KEY AUTOINCREMENT,
-  cliente_id     INTEGER NOT NULL,
-  periodo        TEXT NOT NULL,
-  minutos_usados INTEGER NOT NULL DEFAULT 0,
-  aviso_75       INTEGER NOT NULL DEFAULT 0,
-  aviso_100      INTEGER NOT NULL DEFAULT 0,
-  actualizado    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (cliente_id, periodo),
-  FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
-);
-
 CREATE TABLE IF NOT EXISTS agentes (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   cliente_id      INTEGER NOT NULL,
-  uuid            TEXT,                     -- id del agente (destino UUID del DID); NULL si manual
+  uuid            TEXT,
   nombre          TEXT NOT NULL,
-  dial_number     TEXT,                     -- número interno del agente (por aquí se mide si no hay DDI)
-  ddi             TEXT,                     -- número público (opcional); por aquí se mide y se desvía si existe
-  ivr_corte       TEXT,                     -- IVR de corte de ESTE agente; NULL = usa el del cliente
+  dial_number     TEXT,
+  ddi             TEXT,
+  ivr_corte       TEXT,
   did_dest_backup TEXT,
   estado_desvio   TEXT NOT NULL DEFAULT 'normal',
   creado          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   actualizado     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (cliente_id, ddi),
   FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
+);
+
+-- Consumo POR AGENTE y periodo (AAAA-MM). El total del cliente = suma de sus agentes.
+CREATE TABLE IF NOT EXISTS consumo (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  agente_id      INTEGER NOT NULL,
+  periodo        TEXT NOT NULL,
+  minutos_usados INTEGER NOT NULL DEFAULT 0,
+  actualizado    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (agente_id, periodo),
+  FOREIGN KEY (agente_id) REFERENCES agentes(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS auditoria (
