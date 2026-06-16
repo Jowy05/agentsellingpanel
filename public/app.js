@@ -343,9 +343,7 @@
     var ags=(r.data&&r.data.agentes)||[];
     var rows = ags.length ? ags.map(function(a){
       var cut = a.estado_desvio==='cortado';
-      var divBtn = (admin && a.ddi) ? (cut
-        ? '<button class="btn btn-ghost btn-sm" data-restore="'+a.id+'">Reactivar</button>'
-        : '<button class="btn btn-ghost btn-sm" data-cut="'+a.id+'">Cortar</button>') : '';
+      var divBtn = (admin && a.ddi) ? '<button class="btn btn-ghost btn-sm" data-guide="'+a.id+'" title="Cómo cortar/reactivar en la centralita">🔌 Corte manual</button>' : '';
       return '<div class="agent-row"><div class="agent-meta"><div>'+
         '<div class="agent-name">'+esc(a.nombre)+(cut?' <span class="cut-tag"><span class="sd"></span>Cortado</span>':'')+'</div>'+
         '<div class="agent-sub">DDI '+esc(a.ddi||'—')+(a.dial_number?' · dial '+esc(a.dial_number):'')+' · corte: '+esc(a.ivr_corte||'(por defecto)')+'</div></div></div>'+
@@ -361,19 +359,42 @@
     document.getElementById('ag-add').addEventListener('click', function(){ openAgentForm(c.id); });
     document.getElementById('ag-read').addEventListener('click', function(){ readAgents(c.id); });
     var meterBtn=document.getElementById('ag-meter'); if(meterBtn) meterBtn.addEventListener('click', function(){ refreshConsumo(c.id); });
-    box.querySelectorAll('[data-cut]').forEach(function(b){ b.addEventListener('click', function(){ doDivertAgent(+b.dataset.cut,'cut',c); }); });
-    box.querySelectorAll('[data-restore]').forEach(function(b){ b.addEventListener('click', function(){ doDivertAgent(+b.dataset.restore,'restore',c); }); });
+    box.querySelectorAll('[data-guide]').forEach(function(b){ b.addEventListener('click', function(){
+      var ag=ags.filter(function(x){ return String(x.id)===b.dataset.guide; })[0]; if(ag) openCorteGuide(ag, c);
+    });});
     box.querySelectorAll('[data-delag]').forEach(function(b){ b.addEventListener('click', async function(){
       if(!confirm('¿Quitar este agente?')) return;
       var rr=await api('agents.php',{action:'delete',id:+b.dataset.delag});
       if(rr.data&&rr.data.ok){ toast('Agente quitado'); loadFichaAgents(c); } else toast(emsg(rr.data));
     });});
   }
-  async function doDivertAgent(agentId, action, c){
-    if(!confirm('Esto cambia el desvío en la CENTRALITA REAL. ¿Continuar?')) return;
-    var r=await api('divert.php',{agent_id:agentId, action:action});
-    if(r.data&&r.data.ok){ toast('Desvío '+(action==='cut'?'aplicado':'restaurado')); loadFichaAgents(c); }
-    else toast('PBX: '+emsg(r.data));
+  // Guía paso a paso para cortar/reactivar el agente A MANO en la centralita (el corte por API aún no es posible).
+  function openCorteGuide(a, c){
+    var corte = a.ivr_corte || c.desvio_100 || '(configura un IVR de corte)';
+    var did = esc(a.ddi||'—');
+    var html='<div class="modal-scrim" id="scrimg"><div class="modal" style="max-width:560px"><div class="modal-head"><div>'+
+      '<h3 class="mh-name">Cortar / reactivar en la centralita</h3>'+
+      '<div class="mh-meta">'+esc(a.nombre)+' · DID '+did+'</div></div>'+
+      '<button class="x-close" id="xg">✕</button></div><div class="modal-body">'+
+      '<p class="muted" style="margin:0 0 16px">El corte por API todavía no está disponible (Bicom no lo expone). Hazlo a mano en PBXware — son 3 clics:</p>'+
+      '<div style="margin:0 0 16px"><div style="font-weight:700;margin-bottom:6px;color:var(--c-danger)">① Cortar (cliente al 100%)</div>'+
+      '<ol style="margin:0;padding-left:20px;line-height:1.9">'+
+        '<li>Entra en PBXware (GUI del tenant).</li>'+
+        '<li>Menú <b>DIDs</b> → abre el DID <code>'+did+'</code>.</li>'+
+        '<li>En <b>Destination</b> elige el IVR de corte: <code>'+esc(corte)+'</code>.</li>'+
+        '<li>Pulsa <b>Guardar</b>.</li></ol></div>'+
+      '<div style="margin:0 0 8px"><div style="font-weight:700;margin-bottom:6px;color:var(--c-ok)">② Reactivar (cuando amplíe minutos)</div>'+
+      '<ol style="margin:0;padding-left:20px;line-height:1.9">'+
+        '<li>Abre de nuevo el DID <code>'+did+'</code>.</li>'+
+        '<li>En <b>Destination</b> elige <b>«AI Voice Agents»</b> → Value = <code>'+esc(a.nombre)+'</code>.</li>'+
+        '<li>Pulsa <b>Guardar</b>.</li></ol></div>'+
+      '<p class="muted" style="margin:14px 0 0">Truco: antes de cortar, comprueba que el destino actual es el agente, por si acaso.</p>'+
+      '</div></div></div>';
+    var wrap=document.createElement('div'); wrap.innerHTML=html; document.body.appendChild(wrap.firstChild);
+    var scrim=document.getElementById('scrimg');
+    function close(){ scrim.remove(); }
+    document.getElementById('xg').addEventListener('click', close);
+    scrim.addEventListener('click', function(e){ if(e.target===scrim) close(); });
   }
   async function refreshConsumo(clientId){
     toast('Actualizando consumo desde el CDR… puede tardar unos segundos');
