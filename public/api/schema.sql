@@ -59,8 +59,8 @@ CREATE TABLE IF NOT EXISTS agentes (
   cliente_id      INT UNSIGNED NOT NULL,
   uuid            VARCHAR(64) DEFAULT NULL,        -- id del agente de voz (destino UUID del DID); NULL si manual
   nombre          VARCHAR(190) NOT NULL,
-  dial_number     VARCHAR(40) DEFAULT NULL,        -- número interno del agente (opcional)
-  ddi             VARCHAR(60) NOT NULL,            -- número público; por aquí se mide y se desvía
+  dial_number     VARCHAR(40) DEFAULT NULL,        -- número interno del agente (por aquí se mide si no hay DDI público)
+  ddi             VARCHAR(60) DEFAULT NULL,        -- número público (opcional); por aquí se mide y se desvía si existe
   ivr_corte       VARCHAR(190) DEFAULT NULL,       -- IVR/destino de corte de ESTE agente; NULL = usa el del cliente
   did_dest_backup VARCHAR(190) DEFAULT NULL,       -- destino original del DID, guardado al cortar
   estado_desvio   ENUM('normal','cortado') NOT NULL DEFAULT 'normal',

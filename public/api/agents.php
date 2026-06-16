@@ -69,11 +69,12 @@ switch ($action) {
         if (!$cli) json_out(['error' => 'Cliente no encontrado.'], 404);
         $nombre = trim((string)($in['nombre'] ?? ''));
         $ddi    = trim((string)($in['ddi'] ?? ''));
-        if ($nombre === '' || $ddi === '') json_out(['error' => 'Nombre y DDI son obligatorios.'], 422);
+        $dial   = trim((string)($in['dial_number'] ?? ''));
+        if ($nombre === '' || ($ddi === '' && $dial === '')) json_out(['error' => 'Indica el nombre y al menos el dial number o el DDI.'], 422);
         try {
             $st = db()->prepare('INSERT INTO agentes (cliente_id, nombre, dial_number, ddi, ivr_corte, creado, actualizado)
                                  VALUES (?, ?, ?, ?, ?, NOW(), NOW())');
-            $st->execute([(int)$cli['id'], $nombre, trim((string)($in['dial_number'] ?? '')) ?: null, $ddi, trim((string)($in['ivr_corte'] ?? '')) ?: null]);
+            $st->execute([(int)$cli['id'], $nombre, $dial ?: null, $ddi ?: null, trim((string)($in['ivr_corte'] ?? '')) ?: null]);
         } catch (PDOException $e) {
             if ($e->getCode() === '23000') json_out(['error' => 'Ya existe un agente con ese DDI en este cliente.'], 409);
             throw $e;
