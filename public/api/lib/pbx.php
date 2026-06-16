@@ -102,13 +102,21 @@ function pbx_es_uuid(string $s): bool {
 }
 
 // --- Desvío del DID de un agente (corte/restauración) — usado por divert.php y por el auto-corte ---
-// HALLAZGO (verificado en tenant 216): pbxware.did.edit requiere el "DID ID" (= clave del registro en
-// did.list, p.ej. 71) en el parámetro 'id', y rechaza el destino del agente (un UUID) con CUALQUIER
-// 'type' ("DID destination is not valid for requested destination type"). => No se puede restaurar el
-// DID al agente vía API. PENDIENTE Bicom: formato de did.edit para apuntar/restaurar a un agente IA.
+// CONTRATO REAL de pbxware.did.edit (Postman oficial de Bicom + verificación en vivo tenant 216):
+//   id (REQUERIDO = clave del registro de did.list, p.ej. SKYNET=71)
+//   dest_type (1 dígito, enum 0-17: 0 Extension,1 Forward DID,2 Ring Group,3 IVR,4 Queues,5 External,
+//              6 IVR tree,7 Voicemail,8 Remote,9 Conferences,10 Trunk,11 Fax,12 Phone Callback,
+//              13 Deny,14 CRM Routing,15 Agents(call-center),16 ARI Application,17 Parking)
+//   destination (SOLO dígitos /^\d+$/)
+// 'type' y 'ext' son campos de SALIDA de did.list, NO de entrada. Por eso fallaban los intentos con type/ext.
+// CONSECUENCIA: el destino de un Agente de Voz IA es un UUID (vive solo en did.list.ext, type='-') y NO hay
+// dest_type publicado para "AI Voice Agents" + destination es solo-dígitos => NO se puede (hoy) apuntar/restaurar
+// un DID a un agente IA por la API REST. El tipo existe en la GUI v8 (AI Hub) pero no está publicado en la API.
+// Para CORTAR a un IVR/número sí vale: id + dest_type=3 (IVR) + destination=<número>. PENDIENTE (C1/C2):
+// capturar el POST de la GUI al asignar el agente, o confirmar con Bicom el dest_type/endpoint del AI Hub.
 if (!function_exists('construir_params_did_edit')) {
   function construir_params_did_edit(string $did, string $dest): array {
-    return ['number' => $did, 'ext' => $dest];   // INCOMPLETO a propósito (sin 'id') → did.edit falla seguro hasta validar con Bicom
+    return ['number' => $did, 'ext' => $dest];   // INCOMPLETO a propósito (sin id/dest_type) → did.edit falla seguro hasta migrar el contrato y resolver el restore
   }
 }
 // Destino actual (ext) de un DID según did.list, o null si no se encuentra.
