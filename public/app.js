@@ -139,7 +139,7 @@
   /* ---- Auto-refresh: refresca la pantalla cada 10s y re-mide el CDR cada 60s ---- */
   var AUTO={display:null, meter:null, metering:false}, lastSig='';
   function modalOpen(){ return !!document.querySelector('.modal-scrim'); }
-  function refreshableView(){ return S.view==='datos'||S.view==='stats'||S.view==='clientes'; }
+  function refreshableView(){ return S.view==='stats'||S.view==='clientes'; }
   function clientsSig(){ return S.clients.map(function(c){return c.id+':'+c.minutos_usados+':'+c.porcentaje;}).join('|'); }
   async function autoTick(){
     if(document.hidden) return;
@@ -162,7 +162,7 @@
   function stopAuto(){ if(AUTO.display) clearInterval(AUTO.display); if(AUTO.meter) clearInterval(AUTO.meter); AUTO.display=AUTO.meter=null; }
 
   function renderPanel(){
-    var views=[['clientes','Clientes'],['datos','Consumo'],['stats','Stats'],['mail','Avisos']];
+    var views=[['clientes','Clientes'],['stats','Stats'],['mail','Avisos']];
     if (isAdmin()) views.push(['equipo','Equipo']);
     app.innerHTML =
       '<div class="app">'+
@@ -236,8 +236,7 @@
     app.querySelectorAll('.seg').forEach(function(b){ b.classList.toggle('active', b.dataset.v===S.view); });
     var v=document.getElementById('view');
     if (S.view==='clientes'){ v.innerHTML=viewClientes(); bindClientes(); }
-    else if (S.view==='datos'){ v.innerHTML=viewDatos(); bindDatos(); }
-    else if (S.view==='stats'){ v.innerHTML=viewStats(); bindStats(); }
+    else if (S.view==='stats'){ v.innerHTML=viewStats(); bindStats(); bindDatos(); }
     else if (S.view==='mail'){ v.innerHTML=viewMail(); bindMail(); }
     else if (S.view==='equipo'){ viewEquipo(v); }
     updateAlerts();
@@ -412,20 +411,7 @@
     });
   }
 
-  /* ---- Consumo ---- */
-  function viewDatos(){
-    var rows=S.clients.map(function(c){
-      return '<div class="cli-row"><div class="cli-name"><b>'+esc(c.nombre)+'</b><span class="cli-sector">'+esc(c.sector||'—')+'</span></div>'+
-        '<div class="r cli-mins">'+c.minutos_usados+' / '+c.minutos_contratados+' min</div>'+
-        '<div class="r cli-pct" style="color:'+(c.porcentaje>=100?'var(--c-danger)':c.porcentaje>=75?'var(--c-warn)':'var(--c-ok)')+'">'+c.porcentaje+'%</div>'+
-        '<div class="r">'+estadoBadge(c.porcentaje)+'</div></div>';
-    }).join('');
-    return '<div class="card view-enter"><div class="panel-head"><div><h2 class="ph-title">Consumo · '+esc(S.periodo)+'</h2>'+
-      '<p class="ph-sub">Minutos del periodo actual (del CDR de la centralita)</p></div>'+
-      (isAdmin()?'<button class="btn btn-primary" id="refresh-cdr">↻ Actualizar consumo</button>':'')+'</div>'+
-      '<div class="cli-table"><div class="cli-head"><span>Cliente</span><span class="r">Usado / contratado</span><span class="r">%</span><span class="r">Estado</span></div>'+
-      (S.clients.length?rows:'<div class="cli-empty">No hay clientes.</div>')+'</div></div>';
-  }
+  /* ---- Consumo (botón "Actualizar consumo", reutilizado en la pestaña Stats) ---- */
   function bindDatos(){
     var b=document.getElementById('refresh-cdr');
     if(b) b.addEventListener('click', async function(){
@@ -465,7 +451,8 @@
       '<div class="kpi"><div class="k">Consumo medio</div><div class="v">'+avg+'<small>%</small></div><div class="f">'+totU+' / '+totC+' min</div></div>'+
       '<div class="kpi"><div class="k">En aviso</div><div class="v">'+aviso+'</div><div class="f">75–99%</div></div>'+
       '<div class="kpi"><div class="k">Cortados</div><div class="v">'+cort+'</div><div class="f">100% · desvío</div></div></div>'+
-      '<div class="card"><div class="panel-head"><div><h2 class="ph-title">Consumo por cliente</h2><p class="ph-sub">Periodo '+esc(S.periodo)+' · clic en un cliente para ver su ficha</p></div></div>'+
+      '<div class="card"><div class="panel-head"><div><h2 class="ph-title">Consumo por cliente</h2><p class="ph-sub">Periodo '+esc(S.periodo)+' · clic en un cliente para ver su ficha</p></div>'+
+      (isAdmin()?'<button class="btn btn-primary" id="refresh-cdr">↻ Actualizar consumo</button>':'')+'</div>'+
       (S.clients.length ? '<div class="donut-grid">'+cards+'</div>' : '<div class="cli-empty">No hay clientes.</div>')+'</div>';
   }
   function bindStats(){
