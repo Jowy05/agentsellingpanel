@@ -31,7 +31,7 @@ function aviso_consumo_html(string $nombre, int $nivel, int $usado, int $contr):
   $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
   $n = $e($nombre);
   $azul = '#1489cc';   // mismo azul que el botón "Añadir cliente" del panel
-  $logo = 'https://agentsellingpanel.conexiatec.com/assets/conexia-logo.png';   // se ve al desplegar el panel
+  $logo = 'https://raw.githubusercontent.com/Jowy05/agentsellingpanel/main/public/assets/conexia-logo.png';   // PNG público (repo) — se ve ya en el correo
 
   if ($nivel >= 100) {
     $subject = "Servicio desviado · {$nombre} (100% de minutos)";
