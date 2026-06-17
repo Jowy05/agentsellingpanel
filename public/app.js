@@ -175,7 +175,7 @@
       '<div class="app">'+
       '<div class="topbar"><div class="brand"><div class="logo"></div><div class="divider"></div>'+
         '<div class="titles"><div class="kicker">Conexia</div><h1 id="app-name">Panel Agentes Voz IA</h1></div></div>'+
-        '<div class="topbar-right"><span class="userchip">'+esc(S.user.nombre)+' · '+esc(S.user.rol)+'</span>'+
+        '<div class="topbar-right"><span class="userchip" id="userchip" title="Cambiar contraseña" style="cursor:pointer">'+esc(S.user.nombre)+' · '+esc(S.user.rol)+' 🔑</span>'+
         '<div class="notif-wrap"><button class="notif-btn" id="notif" title="Notificaciones" aria-label="Notificaciones">'+BELL_SVG+'<span class="notif-badge" id="notif-badge"></span></button></div>'+
         '<button class="theme-toggle" id="logout">Salir</button></div></div>'+
       '<div class="nav"><div class="nav-segmented">'+views.map(function(v){return '<button class="seg'+(v[0]===S.view?' active':'')+'" data-v="'+v[0]+'">'+v[1]+'</button>';}).join('')+'</div></div>'+
@@ -185,6 +185,7 @@
     document.getElementById('logout').addEventListener('click', async function(){ stopAuto(); await api('logout.php',{}); renderLogin(); });
     document.getElementById('notif').addEventListener('click', function(e){ e.stopPropagation(); toggleNotif(); });
     document.getElementById('help-fab').addEventListener('click', openGuide);
+    document.getElementById('userchip').addEventListener('click', openChangePass);
     app.querySelectorAll('.seg').forEach(function(b){ b.addEventListener('click', function(){ S.view=b.dataset.v; renderView(); }); });
     renderView();
     startAuto();
@@ -245,6 +246,32 @@
     document.getElementById('xguide').addEventListener('click', close);
     scrim.addEventListener('click', function(e){ if(e.target===scrim) close(); });
     scrim.querySelectorAll('[data-goto]').forEach(function(a){ a.addEventListener('click', function(){ var el=document.getElementById('gsec-'+a.dataset.goto); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }); });
+  }
+
+  /* ---- Cambiar contraseña (propia) ---- */
+  function openChangePass(){
+    var html='<div class="modal-scrim" id="scrimcp"><div class="modal" style="max-width:440px"><div class="modal-head"><div>'+
+      '<h3 class="mh-name">Cambiar contraseña</h3><div class="mh-meta">'+esc(S.user.email||S.user.nombre||'')+'</div></div>'+
+      '<button class="x-close" id="xcp">✕</button></div><div class="modal-body"><form id="f-cp">'+
+      '<div class="field"><label>Contraseña actual</label><input class="field-input" type="password" name="current" autocomplete="current-password" required></div>'+
+      '<div class="field"><label>Nueva contraseña (mín. 10)</label><input class="field-input" type="password" name="new" autocomplete="new-password" minlength="10" required></div>'+
+      '<div class="field"><label>Repetir nueva</label><input class="field-input" type="password" name="new2" autocomplete="new-password" required></div>'+
+      '<div id="cp-err"></div><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">'+
+      '<button type="button" class="btn btn-ghost" id="cpcancel">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div></form></div></div></div>';
+    var wrap=document.createElement('div'); wrap.innerHTML=html; document.body.appendChild(wrap.firstChild);
+    var scrim=document.getElementById('scrimcp'); function close(){ scrim.remove(); }
+    document.getElementById('xcp').addEventListener('click', close);
+    document.getElementById('cpcancel').addEventListener('click', close);
+    scrim.addEventListener('click', function(e){ if(e.target===scrim) close(); });
+    document.getElementById('f-cp').addEventListener('submit', async function(e){
+      e.preventDefault(); var fd=new FormData(e.target);
+      var cur=fd.get('current'), nw=(fd.get('new')||''), nw2=fd.get('new2');
+      if(nw!==nw2){ showErr('cp-err','Las contraseñas nuevas no coinciden.'); return; }
+      if(nw.length<10){ showErr('cp-err','La nueva debe tener al menos 10 caracteres.'); return; }
+      var r=await api('change_pass.php',{current:cur, new:nw});
+      if(r.data&&r.data.ok){ close(); toast('Contraseña cambiada ✓'); }
+      else showErr('cp-err', emsg(r.data));
+    });
   }
 
   /* ---- Avisos / notificaciones ---- */
