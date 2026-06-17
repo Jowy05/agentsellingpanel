@@ -16,7 +16,7 @@ if ([string]::IsNullOrWhiteSpace($tok)) { throw "No se pudo extraer el TOKEN de 
 $H = @{ Authorization = ("cpanel conexiatec:" + $tok) }
 
 $APP = "C:\Users\Lucia\Documents\Panel-Minutos-App"
-$DOCROOT_REMOTE = "/agentsellingpanel.conexiatec.com"   # relativo al home de cPanel
+$DOCROOT_REMOTE = "/public_html/agentsellingpanel.conexiatec.com"   # docroot REAL del subdominio (cPanel lo crea bajo public_html)
 $SECRET_REMOTE  = "/panel-secret"
 
 function Remote-Mkdir($parent, $name) {

@@ -43,12 +43,13 @@ curl -X POST https://agentsellingpanel.conexiatec.com/api/seed_admin.php \
 Requiere el token (cierra la ventana de toma de control) y solo funciona una vez (si `usuarios` está vacía). Hazlo **justo después** del upload. Luego entra en la web y **enrola el 2FA** (QR) en el primer login.
 
 ## 5) Cron del medidor (avisos + auto-corte sin tener el panel abierto)
-En cPanel → **Cron Jobs**, cada 10 min:
+En cPanel → **Cron Jobs**, cada 10 min (vía web, con token — el módulo Cron de UAPI no está, se usó API2 o la UI):
 ```
-php /home/conexiatec/agentsellingpanel.conexiatec.com/api/cron.php
+curl -s "https://agentsellingpanel.conexiatec.com/api/cron.php?token=<cron_token>" >/dev/null 2>&1
 ```
-(alternativa por web: `curl -s "https://agentsellingpanel.conexiatec.com/api/cron.php?token=<cron_token>"`).
-Recalcula el consumo de todos los clientes desde el CDR, manda los avisos 75/100% y aplica el auto-corte. Tiene **lock anti-reentrada** (si una pasada se solapa, la siguiente se salta). Cada pasada hace medición **completa** del mes de todos los clientes → con muchos clientes, subir el intervalo (15-30 min) para no saturar el PBX.
+Recalcula el consumo de todos los clientes desde el CDR, manda los avisos 75/100% y aplica el auto-corte. Tiene **lock anti-reentrada**. Cada pasada hace medición **completa** del mes de todos los clientes → con muchos clientes, subir el intervalo (15-30 min) para no saturar el PBX.
+
+> NOTA del docroot: cPanel crea el subdominio con docroot bajo **`/home/conexiatec/public_html/agentsellingpanel.conexiatec.com/`** (no a nivel home). El `config.php` va a **`/home/conexiatec/panel-secret/`** (fuera de TODOS los docroots → no accesible por web); el `_bootstrap.php` lo localiza probando varias profundidades. `upload.ps1` ya sube al docroot correcto.
 
 ## 6) Verificación post-deploy
 1. Abrir https://agentsellingpanel.conexiatec.com/ → login + 2FA.

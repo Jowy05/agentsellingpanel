@@ -6,8 +6,16 @@ declare(strict_types=1);
 function cfg(): array {
   static $c = null;
   if ($c === null) {
-    $path = getenv('CXPANEL_CONFIG') ?: (__DIR__ . '/../../panel-secret/config.php');
-    if (!is_file($path)) {
+    // Busca el config (fuera del docroot) en varias profundidades: local/docroot a nivel home (../../)
+    // o docroot anidado bajo public_html (../../../). También admite ruta absoluta vía CXPANEL_CONFIG.
+    $cands = [
+      getenv('CXPANEL_CONFIG') ?: null,
+      __DIR__ . '/../../panel-secret/config.php',
+      __DIR__ . '/../../../panel-secret/config.php',
+    ];
+    $path = null;
+    foreach ($cands as $p) { if ($p && is_file($p)) { $path = $p; break; } }
+    if ($path === null) {
       http_response_code(500);
       header('Content-Type: application/json');
       echo json_encode(['error' => 'config_missing']);

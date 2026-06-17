@@ -14,7 +14,7 @@ $file = __DIR__ . '/schema.sql';
 if (!is_file($file)) { echo "ERROR: no se encuentra schema.sql\n"; exit; }
 
 $sql = (string)file_get_contents($file);
-$sql = preg_replace('/^\s*--.*$/m', '', $sql);                 // quita comentarios de línea
+$sql = preg_replace('/--[^\r\n]*/', '', $sql);                 // quita comentarios (de línea Y en línea; llevan ';')
 $stmts = array_filter(array_map('trim', explode(';', $sql)), static fn($s) => $s !== '');
 
 // El esquema es CREATE TABLE IF NOT EXISTS (idempotente, no destructivo); en MySQL el DDL hace auto-commit,
