@@ -49,4 +49,22 @@
 .notif-item:last-child { border-bottom: none; }
 .notif-empty { padding: 18px 14px; color: var(--text-3); font-size: 13px; text-align: center; }
 .empty-note { padding: 40px 20px; text-align: center; color: var(--text-3); }
+
+/* Botón flotante de ayuda + guía de uso */
+.help-fab { position: fixed; right: 22px; bottom: 22px; z-index: 150; width: 54px; height: 54px; border-radius: 50%; border: none; background: var(--accent); color: #fff; cursor: pointer; box-shadow: 0 12px 26px -8px color-mix(in srgb, var(--accent) 70%, transparent); display: inline-flex; align-items: center; justify-content: center; transition: transform .15s ease, filter .15s ease; }
+.help-fab:hover { transform: translateY(-2px); filter: brightness(1.07); }
+.help-fab svg { width: 24px; height: 24px; }
+.guide-modal { max-width: 780px; width: min(780px, 96vw); }
+.guide-body { max-height: 76vh; overflow: auto; }
+.guide-intro { color: var(--text-2); font-size: 13.5px; line-height: 1.6; margin: 0 0 8px; }
+.guide-toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 6px; }
+.guide-toc a { font-size: 12.5px; color: var(--accent-ink); background: var(--accent-soft); padding: 5px 11px; border-radius: 999px; text-decoration: none; cursor: pointer; }
+.guide-sec { padding: 18px 0; border-top: 1px solid var(--border); }
+.guide-sec h3 { font-family: var(--font-display); font-size: 16px; font-weight: 600; margin: 0; color: var(--text); display: flex; align-items: center; gap: 10px; }
+.guide-sec .gs-num { width: 25px; height: 25px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 700; display: inline-grid; place-items: center; flex-shrink: 0; }
+.guide-sec ol, .guide-sec ul { margin: 9px 0 0; padding-left: 22px; line-height: 1.75; font-size: 13.5px; color: var(--text-2); }
+.guide-sec li b, .guide-sec li code { color: var(--text); }
+.guide-sec code { font-family: var(--font-mono); font-size: 12px; background: var(--surface-2); padding: 1px 5px; border-radius: 5px; }
+.guide-demo { margin-top: 12px; padding: 14px 16px; background: var(--surface-2); border: 1px dashed var(--border-strong); border-radius: var(--r-md); }
+.guide-demo .gd-label { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 10px; }
 @media (max-width: 720px) { .form-grid { grid-template-columns: 1fr; } .kpi-row { grid-template-columns: 1fr 1fr; } }

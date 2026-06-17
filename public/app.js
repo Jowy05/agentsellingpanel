@@ -179,12 +179,72 @@
         '<div class="notif-wrap"><button class="notif-btn" id="notif" title="Notificaciones" aria-label="Notificaciones">'+BELL_SVG+'<span class="notif-badge" id="notif-badge"></span></button></div>'+
         '<button class="theme-toggle" id="logout">Salir</button></div></div>'+
       '<div class="nav"><div class="nav-segmented">'+views.map(function(v){return '<button class="seg'+(v[0]===S.view?' active':'')+'" data-v="'+v[0]+'">'+v[1]+'</button>';}).join('')+'</div></div>'+
-      '<div id="view"></div></div>';
+      '<div id="view"></div>'+
+      '<button class="help-fab" id="help-fab" title="Guía de uso" aria-label="Guía de uso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>'+
+      '</div>';
     document.getElementById('logout').addEventListener('click', async function(){ stopAuto(); await api('logout.php',{}); renderLogin(); });
     document.getElementById('notif').addEventListener('click', function(e){ e.stopPropagation(); toggleNotif(); });
+    document.getElementById('help-fab').addEventListener('click', openGuide);
     app.querySelectorAll('.seg').forEach(function(b){ b.addEventListener('click', function(){ S.view=b.dataset.v; renderView(); }); });
     renderView();
     startAuto();
+  }
+
+  /* ---- Guía de uso (botón flotante) ---- */
+  function openGuide(){
+    function donutMini(pct, nombre, mins){
+      return '<div class="donut-card" style="cursor:default">'+donutSVG(pct)+'<div class="dc-name">'+nombre+'</div><div class="dc-mins">'+mins+'</div></div>';
+    }
+    var secs = [
+      { n:'1', t:'Acceso (login + 2FA)', body:
+        '<ol><li>Entra con tu <b>correo</b> y <b>contraseña</b>.</li>'+
+        '<li>La <b>primera vez</b>: escanea el <b>QR</b> con Google Authenticator y guarda los códigos de recuperación.</li>'+
+        '<li>En cada acceso, mete el <b>código de 6 dígitos</b> de la app (caduca cada 30 s).</li></ol>' },
+      { n:'2', t:'Clientes (alta y edición)', body:
+        '<ol><li>Pestaña <b>Clientes</b> → <b>+ Añadir cliente</b>.</li>'+
+        '<li>Pon nombre, <b>Tenant</b> (el <b>código</b>, p.ej. <code>216</code>), <b>minutos contratados</b> (total del cliente) e <b>IVR de corte por defecto</b>.</li>'+
+        '<li>Con los iconos: <b>✎</b> editar, <b>🗑</b> eliminar.</li></ol>',
+        demo: '<div class="cli-table"><div class="cli-row"><div class="cli-name"><b>Clínica Dental Sonrisa</b><span class="cli-sector">Salud · tenant 216</span></div><div class="cli-plan hide-sm">Plan 500</div><div class="r cli-mins hide-sm">500 min</div><div class="r cli-pct" style="color:var(--c-ok)">36%</div><div class="r cli-actions"><button class="icon-btn" type="button">✎</button><button class="icon-btn danger" type="button">🗑</button></div></div></div>' },
+      { n:'3', t:'Ficha y agentes IA', body:
+        '<ol><li>Haz <b>clic en el nombre</b> del cliente para abrir su ficha.</li>'+
+        '<li>En <b>Agentes IA</b>: <b>Leer agentes</b> detecta solos los que tienen DID; o <b>Agregar agente</b> a mano (nombre, dial number, DDI, IVR de corte).</li>'+
+        '<li>Verás los <b>minutos por agente</b> del periodo.</li></ol>',
+        demo: '<div class="agent-row"><div class="agent-meta"><div><div class="agent-name">INTELIGENCIA ARTIFICIAL SKYNET</div><div class="agent-sub">DDI 930905100 · corte: 114</div></div></div><div class="agent-end"><span class="agent-minutes">107<span class="unit">min</span></span></div></div>' },
+      { n:'4', t:'Consumo y Stats', body:
+        '<ol><li>Pestaña <b>Stats</b>: un <b>círculo por cliente</b> con el % usado (verde &lt;75, ámbar 75-99, rojo 100) y «usado / contratado».</li>'+
+        '<li><b>Clic en un cliente</b> → abre su ficha.</li>'+
+        '<li><b>Actualizar consumo</b> recalcula desde el CDR de la centralita. El panel además se <b>actualiza solo</b>.</li></ol>',
+        demo: '<div class="donut-grid" style="padding:0;grid-template-columns:repeat(2,1fr);gap:12px">'+donutMini(36,'Sonrisa','180 / 500 min')+donutMini(100,'conexia','500 / 500 min')+'</div>' },
+      { n:'5', t:'Avisos por email', body:
+        '<ol><li>Al llegar al <b>75%</b> y al <b>100%</b>, el cliente recibe un <b>correo</b> automático (con copia a SAC).</li>'+
+        '<li>Se manda <b>una vez</b> por umbral; si amplías minutos y baja del 75%, se vuelve a avisar al cruzarlo.</li>'+
+        '<li>La <b>campana</b> de arriba parpadea cuando hay clientes en aviso; púlsala para marcarlo leído.</li></ol>',
+        demo: '<div style="display:flex;align-items:center;gap:12px"><span class="notif-btn has-alert warn" style="position:relative">'+BELL_SVG+'<span class="notif-badge warn show">1</span></span><span class="muted">Aviso de consumo activo</span></div>' },
+      { n:'6', t:'Corte automático y reactivación', body:
+        '<ol><li>Al <b>100%</b>, el agente se <b>corta solo</b>: su DID se desvía al IVR de corte (deja de atender).</li>'+
+        '<li>La <b>reactivación es manual</b> en la centralita: el botón <b>«Cómo reactivar»</b> te da el enlace directo al DID (Destination → AI Voice Agents → el agente).</li>'+
+        '<li>Cuando lo hayas hecho, pulsa <b>«✅ Marcar reactivado»</b> para ponerlo activo en el panel.</li></ol>',
+        demo: '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="cut-tag"><span class="sd"></span>Cortado</span><button class="btn btn-ghost btn-sm" type="button">Cómo reactivar</button><button class="btn btn-primary btn-sm" type="button">✅ Marcar reactivado</button></div>' },
+      { n:'7', t:'Equipo (solo admin)', body:
+        '<ol><li>Pestaña <b>Equipo</b>: crea miembros del equipo técnico.</li>'+
+        '<li>Cada uno entra con su correo y configura <b>su propio 2FA</b> en el primer acceso.</li></ol>' },
+    ];
+    var toc  = secs.map(function(s,i){ return '<a data-goto="'+i+'">'+s.n+'. '+esc(s.t)+'</a>'; }).join('');
+    var body = secs.map(function(s,i){
+      return '<div class="guide-sec" id="gsec-'+i+'"><h3><span class="gs-num">'+s.n+'</span>'+esc(s.t)+'</h3>'+s.body+
+        (s.demo ? '<div class="guide-demo"><div class="gd-label">Así se ve</div>'+s.demo+'</div>' : '')+'</div>';
+    }).join('');
+    var html='<div class="modal-scrim" id="scrimguide"><div class="modal guide-modal"><div class="modal-head"><div>'+
+      '<h3 class="mh-name">Guía de uso del panel</h3><div class="mh-meta">Cómo funciona cada parte</div></div>'+
+      '<button class="x-close" id="xguide">✕</button></div>'+
+      '<div class="modal-body guide-body"><p class="guide-intro">Panel para revender el Agente de Voz IA por minutos. Estas son las partes y cómo se usan:</p>'+
+      '<div class="guide-toc">'+toc+'</div>'+body+'</div></div></div>';
+    var wrap=document.createElement('div'); wrap.innerHTML=html; document.body.appendChild(wrap.firstChild);
+    var scrim=document.getElementById('scrimguide');
+    function close(){ scrim.remove(); }
+    document.getElementById('xguide').addEventListener('click', close);
+    scrim.addEventListener('click', function(e){ if(e.target===scrim) close(); });
+    scrim.querySelectorAll('[data-goto]').forEach(function(a){ a.addEventListener('click', function(){ var el=document.getElementById('gsec-'+a.dataset.goto); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }); });
   }
 
   /* ---- Avisos / notificaciones ---- */
