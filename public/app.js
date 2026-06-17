@@ -624,27 +624,30 @@
     var list=document.getElementById('users-list');
     if(r.status!==200 || !r.data.usuarios){ list.innerHTML='<div class="empty-note">'+esc(emsg(r.data))+'</div>'; }
     else {
-      list.innerHTML='<div class="cli-head"><span>Miembro</span><span class="hide-sm">Rol</span><span class="r">2FA</span><span class="r">Estado</span><span class="r">Acciones</span></div>'+
+      list.innerHTML='<div class="cli-head"><span>Miembro</span><span class="hide-sm">Rol</span><span class="r">2FA</span><span class="r">Presencia</span><span class="r">Acciones</span></div>'+
         r.data.usuarios.map(function(u){
+          var pres = u.online ? '<span style="color:var(--c-ok);font-weight:600">● En línea</span>' : '<span style="color:var(--text-3)">○ Desconectado</span>';
+          var borrar = (u.rol==='admin')
+            ? '<span class="icon-btn" title="La cuenta admin no se puede borrar" style="opacity:.4;cursor:not-allowed">🔒</span>'
+            : '<button class="icon-btn danger" data-del="'+u.id+'" title="Borrar cuenta">🗑</button>';
           return '<div class="cli-row"><div class="cli-name"><b>'+esc(u.nombre)+'</b><span class="cli-sector">'+esc(u.email)+'</span></div>'+
             '<div class="cli-plan hide-sm">'+esc(u.rol)+'</div>'+
             '<div class="r">'+(u.totp_enabled?'✓':'—')+'</div>'+
-            '<div class="r">'+esc(u.estado)+'</div>'+
-            '<div class="r cli-actions"><button class="icon-btn" data-r2fa="'+u.id+'" title="Resetear 2FA">↻2FA</button>'+
-            '<button class="icon-btn" data-toggle="'+u.id+'" data-estado="'+esc(u.estado)+'" title="Activar/desactivar">⏻</button></div></div>';
+            '<div class="r">'+pres+'</div>'+
+            '<div class="r cli-actions"><button class="icon-btn" data-r2fa="'+u.id+'" title="Regenerar 2FA">↻2FA</button>'+borrar+'</div></div>';
         }).join('');
     }
     var add=document.getElementById('add-user');
     if(add) add.addEventListener('click', openUserForm);
     v.querySelectorAll('[data-r2fa]').forEach(function(b){ b.addEventListener('click', async function(){
-      if(!confirm('¿Resetear el 2FA de este miembro? Tendrá que volver a enrolarlo.')) return;
+      if(!confirm('¿Regenerar el 2FA de este miembro? Tendrá que volver a escanear el QR en su próximo acceso.')) return;
       var r=await api('users.php',{action:'reset_2fa', id:+b.dataset.r2fa});
-      toast(r.status===200?'2FA reseteado':emsg(r.data)); viewEquipo(v);
+      toast(r.status===200?'2FA regenerado':emsg(r.data)); viewEquipo(v);
     });});
-    v.querySelectorAll('[data-toggle]').forEach(function(b){ b.addEventListener('click', async function(){
-      var act = b.dataset.estado==='activo' ? 'deactivate':'activate';
-      var r=await api('users.php',{action:act, id:+b.dataset.toggle});
-      toast(r.status===200?'Hecho':emsg(r.data)); viewEquipo(v);
+    v.querySelectorAll('[data-del]').forEach(function(b){ b.addEventListener('click', async function(){
+      if(!confirm('¿Borrar esta cuenta? No se puede deshacer.')) return;
+      var r=await api('users.php',{action:'delete', id:+b.dataset.del});
+      toast(r.status===200?'Cuenta borrada':emsg(r.data)); viewEquipo(v);
     });});
   }
   function openUserForm(){

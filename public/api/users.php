@@ -57,11 +57,20 @@ switch ($action) {
     // Selección explícita: nunca se exponen pass_hash ni totp_secret.
     $st = db()->query(
       'SELECT id, email, nombre, rol, totp_enabled, estado, intentos,
-              bloqueado_hasta, creado, ultimo_login
+              bloqueado_hasta, creado, ultimo_login, ultimo_visto
          FROM usuarios
         ORDER BY creado DESC'
     );
     $usuarios = $st->fetchAll(PDO::FETCH_ASSOC);
+    // "online" = visto en los últimos 90 s. Se usa el "ahora" de la BD (misma base horaria que ultimo_visto)
+    // y se compara la DIFERENCIA, así no importa la zona horaria.
+    $dbNow = (string) db()->query('SELECT NOW()')->fetchColumn();   // compat sqlite -> CURRENT_TIMESTAMP
+    $tNow  = strtotime($dbNow) ?: time();
+    foreach ($usuarios as &$u) {
+      $uv = $u['ultimo_visto'] ?? null;
+      $u['online'] = ($uv && ($tNow - (strtotime((string)$uv) ?: 0)) <= 90);
+    }
+    unset($u);
     json_out(['usuarios' => $usuarios]);
     break;
   }
@@ -218,6 +227,19 @@ switch ($action) {
 
     db()->prepare("UPDATE usuarios SET estado = 'activo' WHERE id = ?")->execute([$id]);
     audit($admin['id'], 'user_activate', "id=$id");
+    json_out(['ok' => true]);
+    break;
+  }
+
+  // -------- Borrar cuenta (admin protegido) --------
+  case 'delete': {
+    $id = leer_id($in);
+    if ($id === (int)$admin['id']) json_out(['error' => 'auto_borrado', 'detalle' => 'No puedes borrar tu propia cuenta.'], 409);
+    $u = obtener_usuario($id);
+    if (($u['rol'] ?? '') === 'admin') json_out(['error' => 'admin_no_borrable', 'detalle' => 'Las cuentas admin no se pueden borrar.'], 409);
+    // codigos_recuperacion se borran en cascada (FK ON DELETE CASCADE).
+    db()->prepare('DELETE FROM usuarios WHERE id = ?')->execute([$id]);
+    audit($admin['id'], 'user_delete', "id=$id email=" . ($u['email'] ?? ''));
     json_out(['ok' => true]);
     break;
   }

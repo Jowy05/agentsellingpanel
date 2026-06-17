@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS usuarios (
   intentos        INTEGER NOT NULL DEFAULT 0,
   bloqueado_hasta TEXT DEFAULT NULL,
   creado          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  ultimo_login    TEXT DEFAULT NULL
+  ultimo_login    TEXT DEFAULT NULL,
+  ultimo_visto    TEXT DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS codigos_recuperacion (

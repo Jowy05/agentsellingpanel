@@ -82,7 +82,14 @@ function body_json(): array {
 function require_auth(bool $require2fa = true): array {
   if (empty($_SESSION['uid'])) json_out(['error' => 'no_auth'], 401);
   if ($require2fa && empty($_SESSION['twofa_ok'])) json_out(['error' => '2fa_required'], 401);
-  return ['id' => (int)$_SESSION['uid'], 'rol' => $_SESSION['rol'] ?? 'tecnico'];
+  $uid = (int)$_SESSION['uid'];
+  // Presencia: marca "visto" como mucho cada 30 s (para el indicador "en línea" del Equipo). Nunca rompe la petición.
+  $now = time();
+  if (($now - (int)($_SESSION['touch'] ?? 0)) >= 30) {
+    try { db()->prepare('UPDATE usuarios SET ultimo_visto = NOW() WHERE id = ?')->execute([$uid]); } catch (Throwable $e) {}
+    $_SESSION['touch'] = $now;
+  }
+  return ['id' => $uid, 'rol' => $_SESSION['rol'] ?? 'tecnico'];
 }
 
 function require_admin(): array {
