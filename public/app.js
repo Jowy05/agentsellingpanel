@@ -613,7 +613,7 @@
         '<div class="field"><label>Asunto</label><input class="field-input" id="mail-subject" value="'+esc(m.asunto)+'"></div>'+
         '<div class="field"><label>Mensaje</label><textarea class="field-input" id="mail-msg" style="min-height:200px">'+esc(m.cuerpo)+'</textarea></div>'+
         '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px">'+
-        '<span class="muted">Se envía desde la cuenta de Conexia, con el logo. Sin copia a nadie.</span>'+
+        '<span class="muted">Se envía desde Conexia (con el logo) y con copia a SAC.</span>'+
         '<button class="btn btn-primary" id="mail-send">✉ Enviar correo</button></div>';
       document.getElementById('mail-send').addEventListener('click', sendMail);
     }

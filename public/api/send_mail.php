@@ -17,7 +17,7 @@ if (!filter_var($to, FILTER_VALIDATE_EMAIL)) json_out(['error' => 'email_invalid
 if ($subject === '' || mb_strlen($subject) > 200) json_out(['error' => 'asunto_requerido'], 422);
 if (trim($cuerpo) === '') json_out(['error' => 'mensaje_requerido'], 422);
 
-$ok = n8n_webhook_post(['to' => $to, 'cc' => '', 'subject' => $subject, 'html' => correo_generico_html($cuerpo)]);
+$ok = n8n_webhook_post(['to' => $to, 'subject' => $subject, 'html' => correo_generico_html($cuerpo)]);   // CC a SAC (del config)
 audit($u['id'], 'mail_manual', 'to=' . $to . ' asunto=' . mb_substr($subject, 0, 80));
 
 json_out($ok ? ['ok' => true] : ['error' => 'envio_fallido', 'detalle' => 'No se pudo enviar (revisa el webhook de n8n).'], $ok ? 200 : 502);
