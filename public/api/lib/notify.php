@@ -87,6 +87,23 @@ function aviso_consumo_html(string $nombre, int $nivel, int $usado, int $contr):
   return ['subject' => $subject, 'html' => $html];
 }
 
+// Envoltorio de marca para un correo libre (envío manual desde "Avisos"): cabecera azul + logo + texto.
+function correo_generico_html(string $cuerpo): string {
+  $azul = '#1489cc';
+  $logo = 'https://raw.githubusercontent.com/Jowy05/agentsellingpanel/main/public/assets/conexia-logo-blanco.png';
+  $body = nl2br(htmlspecialchars($cuerpo, ENT_QUOTES, 'UTF-8'));
+  return
+  '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#eef2f1;margin:0;padding:24px 0"><tr><td align="center">'
+  . '<table role="presentation" cellpadding="0" cellspacing="0" width="600" style="max-width:600px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden;font-family:Arial,Helvetica,sans-serif">'
+  .   '<tr><td style="background:' . $azul . ';padding:20px 28px">'
+  .     '<table role="presentation" cellpadding="0" cellspacing="0"><tr><td><img src="' . $logo . '" alt="Conexia" height="26" style="display:block;height:26px;border:0"></td>'
+  .     '<td style="padding-left:14px;color:#e8f4fc;font-size:13px;font-weight:700">Agente de Voz IA</td></tr></table>'
+  .   '</td></tr>'
+  .   '<tr><td style="padding:28px 30px;color:#222;font-size:15px;line-height:1.6">' . $body . '</td></tr>'
+  .   '<tr><td style="background:#f4f6f6;padding:16px 30px;color:#8a8a8a;font-size:12px;line-height:1.5">Conexia Telecom &middot; Agente de Voz IA.</td></tr>'
+  . '</table></td></tr></table>';
+}
+
 // Comprueba el umbral del cliente y envía el aviso UNA vez por (cliente, periodo, nivel).
 // Los flags se RESETEAN al bajar del umbral (p.ej. al ampliar minutos), para volver a avisar si se vuelve a cruzar
 // — sin spam, porque el uso solo baja al recargar minutos.

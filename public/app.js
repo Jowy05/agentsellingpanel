@@ -601,7 +601,7 @@
     if(!S.clients.length) return '<div class="card view-enter"><div class="empty-note">No hay clientes.</div></div>';
     var opts=S.clients.map(function(c){return '<option value="'+c.id+'">'+esc(c.nombre)+'</option>';}).join('');
     return '<div class="card view-enter"><div class="panel-head"><div><h2 class="ph-title">Avisos de consumo</h2>'+
-      '<p class="ph-sub">Texto auto-generado · el envío real se hará por n8n</p></div>'+
+      '<p class="ph-sub">Plantilla automática editable · envía un aviso (o un correo libre) al cliente cuando quieras</p></div>'+
       '<div class="client-select"><label>Cliente</label><div class="select-shell"><select id="mail-cli">'+opts+'</select></div></div></div>'+
       '<div class="mail-grid" id="mail-body"></div></div>';
   }
@@ -609,12 +609,26 @@
     var sel=document.getElementById('mail-cli'); if(!sel) return;
     function render(){ var c=findClient(+sel.value); if(!c) return; var m=buildEmail(c);
       document.getElementById('mail-body').innerHTML=
-        '<div class="field"><label>Para</label><input class="field-input" value="'+esc(c.correo||'')+'" readonly></div>'+
-        '<div class="field"><label>Asunto</label><input class="field-input" value="'+esc(m.asunto)+'"></div>'+
-        '<div class="field"><label>Mensaje</label><textarea class="field-input" style="min-height:200px">'+esc(m.cuerpo)+'</textarea></div>'+
-        '<div class="muted" style="padding:8px 2px">Maqueta — no se envía ningún correo desde aquí.</div>';
+        '<div class="field"><label>Para</label><input class="field-input" id="mail-to" value="'+esc(c.correo||'')+'" placeholder="correo del destinatario"></div>'+
+        '<div class="field"><label>Asunto</label><input class="field-input" id="mail-subject" value="'+esc(m.asunto)+'"></div>'+
+        '<div class="field"><label>Mensaje</label><textarea class="field-input" id="mail-msg" style="min-height:200px">'+esc(m.cuerpo)+'</textarea></div>'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px">'+
+        '<span class="muted">Se envía desde la cuenta de Conexia, con el logo. Sin copia a nadie.</span>'+
+        '<button class="btn btn-primary" id="mail-send">✉ Enviar correo</button></div>';
+      document.getElementById('mail-send').addEventListener('click', sendMail);
     }
     sel.addEventListener('change', render); render();
+  }
+  async function sendMail(){
+    var to=(document.getElementById('mail-to').value||'').trim();
+    var subject=(document.getElementById('mail-subject').value||'').trim();
+    var body=document.getElementById('mail-msg').value||'';
+    if(!to || !subject || !body.trim()){ toast('Completa destinatario, asunto y mensaje.'); return; }
+    if(!confirm('¿Enviar este correo a '+to+'?')) return;
+    var btn=document.getElementById('mail-send'); btn.disabled=true; var prev=btn.textContent; btn.textContent='Enviando…';
+    var r=await api('send_mail.php',{to:to, subject:subject, body:body});
+    btn.disabled=false; btn.textContent=prev;
+    if(r.data&&r.data.ok) toast('Correo enviado a '+to); else toast('No se pudo enviar: '+emsg(r.data));
   }
 
   /* ---- Equipo (admin) ---- */
