@@ -31,7 +31,7 @@ function aviso_consumo_html(string $nombre, int $nivel, int $usado, int $contr):
   $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
   $n = $e($nombre);
   $azul = '#1489cc';   // mismo azul que el botón "Añadir cliente" del panel
-  $logo = 'https://raw.githubusercontent.com/Jowy05/agentsellingpanel/main/public/assets/conexia-logo.png';   // PNG público (repo) — se ve ya en el correo
+  $logo = 'https://raw.githubusercontent.com/Jowy05/agentsellingpanel/main/public/assets/conexia-logo-blanco.png';   // logo BLANCO transparente (va sobre el azul, sin fondo)
 
   if ($nivel >= 100) {
     $subject = "Servicio desviado · {$nombre} (100% de minutos)";
@@ -53,10 +53,10 @@ function aviso_consumo_html(string $nombre, int $nivel, int $usado, int $contr):
   '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#eef2f1;margin:0;padding:24px 0">'
   . '<tr><td align="center">'
   . '<table role="presentation" cellpadding="0" cellspacing="0" width="600" style="max-width:600px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden;font-family:Arial,Helvetica,sans-serif">'
-  .   '<tr><td style="background:' . $azul . ';padding:18px 28px">'
+  .   '<tr><td style="background:' . $azul . ';padding:20px 28px">'
   .     '<table role="presentation" cellpadding="0" cellspacing="0"><tr>'
-  .       '<td style="background:#ffffff;border-radius:8px;padding:7px 12px"><img src="' . $logo . '" alt="Conexia" height="22" style="display:block;height:22px;border:0"></td>'
-  .       '<td style="padding-left:14px;color:#eaf4fb;font-size:13px;font-weight:700">Agente de Voz IA</td>'
+  .       '<td><img src="' . $logo . '" alt="Conexia" height="26" style="display:block;height:26px;border:0"></td>'
+  .       '<td style="padding-left:14px;color:#e8f4fc;font-size:13px;font-weight:700">Agente de Voz IA</td>'
   .     '</tr></table>'
   .   '</td></tr>'
   .   '<tr><td style="padding:28px 30px 6px">'
