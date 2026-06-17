@@ -63,5 +63,25 @@ if (Test-Path $cfgProd) {
 "-- público (docroot) --"
 Upload-Tree (Join-Path $APP "public") $DOCROOT_REMOTE
 
+# -- Cache-busting: re-subir index.html sellado con una version UNICA de este deploy --
+# Reescribe todos los ?v=... de index.html a ?v=<fecha-hash> para que ningun navegador
+# se quede con un app.js/app.css viejo cacheado tras una actualizacion.
+$ver = (Get-Date -Format 'yyyyMMddHHmm')
+try { $gh = (git -C $APP rev-parse --short HEAD 2>$null); if ($gh) { $ver = "$ver-$gh" } } catch {}
+$idxSrc = Join-Path $APP "public\index.html"
+if (Test-Path $idxSrc) {
+  $html = Get-Content -Raw -LiteralPath $idxSrc
+  $html = [regex]::Replace($html, '\?v=[0-9A-Za-z._-]+', "?v=$ver")
+  if (-not $GO) {
+    "  [stamp] index.html -> ?v=$ver (re-subida sobre $DOCROOT_REMOTE)"
+  } else {
+    $idxTmp = Join-Path ([IO.Path]::GetTempPath()) "index.html"
+    [IO.File]::WriteAllText($idxTmp, $html, (New-Object System.Text.UTF8Encoding($false)))
+    Remote-Upload $idxTmp $DOCROOT_REMOTE
+    Remove-Item $idxTmp -Force -ErrorAction SilentlyContinue
+    "  index.html sellado con ?v=$ver"
+  }
+}
+
 if (-not $GO) { "`n[Modo comprobación] No se ha subido nada. Pon `$GO = `$true para subir de verdad." }
 else { "`nSUBIDA COMPLETA. Verifica en https://agentsellingpanel.conexiatec.com/" }

@@ -18,4 +18,16 @@ Options -Indexes
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "DENY"
   Header always set Referrer-Policy "no-referrer"
+
+  # El HTML se revalida SIEMPRE: así el navegador coge al instante el index.html
+  # nuevo (que apunta a app.js?v=NUEVA) y nunca se queda con una versión vieja.
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache, max-age=0, must-revalidate"
+  </FilesMatch>
+
+  # Los assets llevan ?v= (cache-busting), así que se pueden cachear a tope:
+  # cuando cambia el contenido cambia la URL y el navegador lo vuelve a bajar.
+  <FilesMatch "\.(js|css|png|jpg|jpeg|gif|svg|ico|webp|woff2?|ttf)$">
+    Header set Cache-Control "public, max-age=31536000"
+  </FilesMatch>
 </IfModule>
