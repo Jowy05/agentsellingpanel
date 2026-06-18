@@ -43,7 +43,9 @@
   function pct(c) { return c.minutos_contratados ? Math.round(c.minutos_usados / c.minutos_contratados * 100) : 0; }
   function cliFull(c) {
     var p = pct(c);
-    return Object.assign({}, c, { porcentaje: p, estado: p >= 100 ? 'cortado' : 'normal', num_agentes: (agents[c.id] || []).length });
+    var cortados = (agents[c.id] || []).filter(function (a) { return a.estado_desvio === 'cortado'; })
+      .map(function (a) { return { id: a.id, nombre: a.nombre, ddi: a.ddi }; });
+    return Object.assign({}, c, { porcentaje: p, estado: p >= 100 ? 'cortado' : 'normal', num_agentes: (agents[c.id] || []).length, agentes_cortados: cortados });
   }
   function findCli(id) { for (var i = 0; i < clients.length; i++) if (clients[i].id === +id) return clients[i]; return null; }
 

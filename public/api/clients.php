@@ -197,6 +197,13 @@ switch ($action) {
         $stmt->execute([$periodo]);
         $filas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // Agentes cortados (desviados) agrupados por cliente, para la campana de avisos.
+        // Persisten hasta que se marca la reactivación (divert.php action=reactivado).
+        $cutMap = [];
+        foreach (db()->query("SELECT cliente_id, id, nombre, ddi FROM agentes WHERE estado_desvio = 'cortado' ORDER BY nombre ASC")->fetchAll(PDO::FETCH_ASSOC) as $ca) {
+            $cutMap[(int)$ca['cliente_id']][] = ['id' => (int)$ca['id'], 'nombre' => $ca['nombre'], 'ddi' => $ca['ddi']];
+        }
+
         $clientes = [];
         foreach ($filas as $f) {
             $contratados = (int)$f['minutos_contratados'];
@@ -208,6 +215,7 @@ switch ($action) {
             $f['porcentaje']          = $calc['porcentaje'];
             $f['estado']              = $calc['estado'];
             $f['periodo']             = $periodo;
+            $f['agentes_cortados']    = $cutMap[(int)$f['id']] ?? [];
             $clientes[] = $f;
         }
 

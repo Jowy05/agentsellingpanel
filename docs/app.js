@@ -279,9 +279,14 @@
     var list = S.clients.filter(function(c){ return c.porcentaje >= 75; })
       .map(function(c){ return { nombre:c.nombre, pct:c.porcentaje, level: c.porcentaje>=100?'danger':'warn' }; })
       .sort(function(a,b){ return b.pct - a.pct; });
-    var level = list.some(function(x){ return x.level==='danger'; }) ? 'danger' : (list.length ? 'warn' : null);
-    var sig = list.map(function(x){ return x.nombre+':'+x.level; }).join('|');
-    return { list:list, level:level, sig:sig };
+    // Agentes desviados (cortados): persisten hasta que se marca la reactivación.
+    var cuts = [];
+    S.clients.forEach(function(c){
+      (c.agentes_cortados||[]).forEach(function(a){ cuts.push({ agentId:a.id, agente:a.nombre||'Agente', cliente:c.nombre }); });
+    });
+    var level = (list.some(function(x){ return x.level==='danger'; }) || cuts.length) ? 'danger' : (list.length ? 'warn' : null);
+    var parts = list.map(function(x){ return x.nombre+':'+x.level; }).concat(cuts.map(function(x){ return 'cut'+x.agentId; }));
+    return { list:list, cuts:cuts, level:level, sig:parts.join('|') };
   }
   function alertsAcked(sig){ try { return localStorage.getItem(ACK_KEY) === sig; } catch(e){ return false; } }
   function ackAlerts(sig){ try { localStorage.setItem(ACK_KEY, sig); } catch(e){} }
@@ -290,15 +295,16 @@
 
   function updateAlerts(){
     var a = computeAlerts();
+    var total = a.list.length + a.cuts.length;
     var unacked = a.sig !== '' && !alertsAcked(a.sig);
     var btn = document.getElementById('notif');
-    if (btn){ btn.classList.remove('has-alert','warn','danger'); if (a.list.length) btn.classList.add('has-alert', a.level); }
+    if (btn){ btn.classList.remove('has-alert','warn','danger'); if (total) btn.classList.add('has-alert', a.level); }
     var badge = document.getElementById('notif-badge');
-    if (badge){ badge.textContent = a.list.length ? String(a.list.length) : ''; badge.className = 'notif-badge' + (a.list.length ? (' show' + (a.level==='warn' ? ' warn' : '')) : ''); }
+    if (badge){ badge.textContent = total ? String(total) : ''; badge.className = 'notif-badge' + (total ? (' show' + (a.level==='warn' ? ' warn' : '')) : ''); }
     // Parpadeo en el TÍTULO DE LA PESTAÑA: el "(N)" aparece y desaparece.
     if (titleTimer){ clearInterval(titleTimer); titleTimer = null; }
-    if (unacked && a.list.length){
-      var pre = '(' + a.list.length + ') ';
+    if (unacked && total){
+      var pre = '(' + total + ') ';
       var on = true; document.title = pre + DOC_TITLE;
       titleTimer = setInterval(function(){ on = !on; document.title = (on ? pre : '') + DOC_TITLE; }, 900);
     } else {
@@ -312,18 +318,42 @@
     var open = wrap.querySelector('.notif-dropdown');
     if (open){ open.remove(); return; }
     var a = computeAlerts();
-    var items = a.list.length ? a.list.map(function(x){
+    // Sección 1: consumo (75% / 100%). Se autorresuelven al bajar el consumo.
+    var consumo = a.list.length ? a.list.map(function(x){
       var badge = x.level==='danger'
         ? '<span class="state-badge cortado"><span class="sd"></span>100%</span>'
         : '<span class="state-badge aviso"><span class="sd"></span>Aviso</span>';
       return '<div class="notif-item"><span><b>'+esc(x.nombre)+'</b> · '+x.pct+'%</span>'+badge+'</div>';
-    }).join('') : '<div class="notif-empty">Sin avisos. Todo dentro de lo previsto.</div>';
+    }).join('') : '<div class="notif-empty">Sin avisos de consumo.</div>';
+    // Sección 2: agentes desviados. PERSISTEN hasta marcar reactivado (no se quitan solos).
+    var admin = isAdmin();
+    var cortes = a.cuts.length ? a.cuts.map(function(x){
+      var btn = admin ? '<button class="btn btn-primary btn-sm" data-react-bell="'+x.agentId+'" data-nom="'+esc(x.agente)+'" title="Lo he reactivado en la centralita">✅ Reactivado</button>' : '';
+      return '<div class="notif-item"><span><b>'+esc(x.agente)+'</b> · '+esc(x.cliente)+' <span class="cut-tag"><span class="sd"></span>Desviado</span></span>'+btn+'</div>';
+    }).join('') : '<div class="notif-empty">Ningún agente desviado.</div>';
     var dd = document.createElement('div'); dd.className = 'notif-dropdown';
-    dd.innerHTML = '<div class="nd-head">Avisos de consumo</div>' + items;
+    dd.innerHTML = '<div class="nd-head">Avisos</div>'
+      + '<div class="nd-sub">Consumo</div>' + consumo
+      + '<div class="nd-sub">Agentes desactivados</div>' + cortes;
     wrap.appendChild(dd);
-    ackAlerts(a.sig);   // abrir el panel = marcar como leído -> deja de parpadear
+    dd.querySelectorAll('[data-react-bell]').forEach(function(b){
+      b.addEventListener('click', function(e){ e.stopPropagation(); doReactivadoFromBell(+b.dataset.reactBell, b.dataset.nom); });
+    });
+    ackAlerts(a.sig);   // abrir el panel = marcar como leído -> deja de parpadear (los desviados siguen listados)
     updateAlerts();
     setTimeout(function(){ document.addEventListener('click', function onDoc(e){ if (!wrap.contains(e.target)){ dd.remove(); document.removeEventListener('click', onDoc); } }); }, 0);
+  }
+  // Reactivar un agente desde la campana (admin). Marca estado='normal' en BD; la reactivación
+  // real en la centralita la ha hecho el técnico a mano (la API no devuelve el DID al agente IA).
+  async function doReactivadoFromBell(agentId, nom){
+    if(!confirm('¿Ya has reactivado «'+(nom||'el agente')+'» en la centralita (Destination → AI Voice Agents)?\n\nPulsa Aceptar SOLO si ya lo has hecho en la GUI; esto lo quita de los avisos.')) return;
+    var r=await api('divert.php',{agent_id:agentId, action:'reactivado'});
+    if(r.data&&r.data.ok){
+      toast('Marcado como reactivado');
+      await reloadClients();
+      var dd=document.querySelector('.notif-dropdown'); if(dd) dd.remove();
+      toggleNotif();   // reabrir con la lista ya actualizada
+    } else toast(emsg(r.data));
   }
 
   function renderView(quiet){
