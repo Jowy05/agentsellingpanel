@@ -11,6 +11,7 @@ $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 if ($metodo !== 'GET' && $metodo !== 'POST') {
     json_out(['error' => 'Método no permitido'], 405);
 }
+require_csrf();   // anti-CSRF en el POST de confirmación (no-op en GET)
 
 // Resuelve el usuario destino: sesión completa o enrolado pendiente (pending_uid).
 $uid       = null;

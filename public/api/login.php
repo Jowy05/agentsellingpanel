@@ -10,6 +10,7 @@ require __DIR__ . '/_bootstrap.php';
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     json_out(['error' => 'método no permitido'], 405);
 }
+require_csrf();   // anti-CSRF: exige Content-Type JSON + X-CSRF-Token de la sesión
 
 // Hash dummy (formato bcrypt válido) para igualar el tiempo de respuesta
 // cuando el email no existe y evitar fugas por temporización (user enumeration).

@@ -6,7 +6,7 @@ require __DIR__ . '/_bootstrap.php';
 require __DIR__ . '/lib/notify.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') json_out(['error' => 'method_not_allowed'], 405);
-$u = require_auth();
+$u = require_admin();   // envío manual de correos (a destinatario arbitrario): solo admin
 
 $in      = body_json();
 $to      = strtolower(trim((string)($in['to'] ?? '')));

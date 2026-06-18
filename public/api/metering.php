@@ -9,7 +9,7 @@ set_exception_handler(function (Throwable $e): void {
     json_out(['error' => 'Error interno del servidor.'], 500);
 });
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') json_out(['error' => 'Método no permitido'], 405);
-$auth = require_auth(true);
+$auth = require_admin();   // recalcular consumo puede disparar avisos y auto-corte: solo admin
 
 $in       = body_json();
 $clientId = isset($in['client_id']) ? (int)$in['client_id'] : 0;

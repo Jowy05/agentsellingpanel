@@ -1,56 +1,51 @@
 <?php
 // public/api/session.php
-// Devuelve los datos del usuario en sesion (sesion completa requerida).
-// Solo lectura ("whoami"): GET + require_auth() (uid + rol + twofa_ok).
+// "whoami" + token CSRF. GET. Devuelve SIEMPRE el token CSRF de la sesión (lo necesita el SPA
+// incluso sin login, para poder enviar el POST de login). Incluye 'user' solo si hay sesión completa.
 require __DIR__ . '/_bootstrap.php';
 
-// Solo GET: cualquier otro metodo no procede.
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
     json_out(['error' => 'Metodo no permitido'], 405);
 }
 
-// Exige sesion completa (uid + rol + twofa_ok).
-$auth = require_auth();
+$resp = ['user' => null, 'csrf' => csrf_token()];
 
-// Consulta a BD los datos actuales del usuario (sentencia preparada).
-// Solo columnas no sensibles: jamas se exponen pass_hash, totp_secret, etc.
-try {
-    $stmt = db()->prepare(
-        'SELECT id, email, nombre, rol, estado FROM usuarios WHERE id = ? LIMIT 1'
-    );
-    $stmt->execute([$auth['id']]);
-    $user = $stmt->fetch();
-} catch (Throwable $e) {
-    // No filtrar detalles de PDO/SQL al cliente.
-    json_out(['error' => 'Error interno'], 500);
-}
-
-// El usuario podria haber sido eliminado o desactivado tras iniciar sesion.
-// En ambos casos la sesion deja de ser valida: se destruye y se exige re-login.
-if (!$user || ($user['estado'] ?? '') !== 'activo') {
-    $_SESSION = [];
-    if (ini_get('session.use_cookies')) {
-        $p = session_get_cookie_params();
-        setcookie(
-            session_name(),
-            '',
-            time() - 42000,
-            $p['path'],
-            $p['domain'],
-            $p['secure'],
-            $p['httponly']
-        );
+// ¿Sesión completa (uid + 2FA)?
+if (!empty($_SESSION['uid']) && !empty($_SESSION['twofa_ok'])) {
+    $uid = (int) $_SESSION['uid'];
+    try {
+        $stmt = db()->prepare('SELECT id, email, nombre, rol, estado FROM usuarios WHERE id = ? LIMIT 1');
+        $stmt->execute([$uid]);
+        $user = $stmt->fetch();
+    } catch (Throwable $e) {
+        json_out(['error' => 'Error interno'], 500);
     }
-    session_destroy();
-    json_out(['error' => 'no_auth'], 401);
+
+    if ($user && ($user['estado'] ?? '') === 'activo') {
+        // Presencia: marca "visto" como mucho cada 30 s.
+        $now = time();
+        if (($now - (int)($_SESSION['touch'] ?? 0)) >= 30) {
+            try { db()->prepare('UPDATE usuarios SET ultimo_visto = NOW() WHERE id = ?')->execute([$uid]); } catch (Throwable $e) {}
+            $_SESSION['touch'] = $now;
+        }
+        $resp['user'] = [
+            'id'     => (int) $user['id'],
+            'email'  => (string) $user['email'],
+            'nombre' => (string) $user['nombre'],
+            'rol'    => (string) $user['rol'],
+        ];
+    } else {
+        // El usuario fue eliminado o desactivado tras iniciar sesión: invalidar y emitir token nuevo.
+        $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $p = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000, $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+        }
+        session_destroy();
+        session_start();
+        if (empty($_SESSION['csrf'])) { $_SESSION['csrf'] = bin2hex(random_bytes(32)); }
+        $resp['csrf'] = csrf_token();
+    }
 }
 
-// Respuesta segun ESPEC: {user:{id,email,nombre,rol}}.
-json_out([
-    'user' => [
-        'id'     => (int) $user['id'],
-        'email'  => (string) $user['email'],
-        'nombre' => (string) $user['nombre'],
-        'rol'    => (string) $user['rol'],
-    ],
-], 200);
+json_out($resp, 200);

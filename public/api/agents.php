@@ -13,6 +13,12 @@ $auth   = require_auth(true);
 $in     = body_json();
 $action = (string)($in['action'] ?? '');
 
+// Solo admin puede modificar agentes (alta manual, importar de la centralita, editar, borrar).
+// El rol técnico tiene acceso de SOLO LECTURA (read/list/gui_url).
+if (in_array($action, ['create', 'update', 'delete', 'import'], true) && ($auth['rol'] ?? '') !== 'admin') {
+    json_out(['error' => 'forbidden', 'detalle' => 'Esta acción requiere rol administrador.'], 403);
+}
+
 function cliente_de($id) {
     $st = db()->prepare('SELECT id, nombre, tenant, desvio_100 FROM clientes WHERE id = ? LIMIT 1');
     $st->execute([(int)$id]);

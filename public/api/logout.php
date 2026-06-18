@@ -6,6 +6,7 @@ require __DIR__ . '/_bootstrap.php';
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     json_out(['error' => 'Método no permitido'], 405);
 }
+require_csrf();   // anti-CSRF: evita logout forzado cross-site
 
 // Registramos el cierre solo si había una sesión COMPLETA (uid presente).
 // No exponemos datos de sesión en la respuesta ni en la auditoría.

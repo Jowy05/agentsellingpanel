@@ -10,12 +10,19 @@
   var BELL_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20a2 2 0 0 0 4 0"/></svg>';
   var titleTimer = null;
 
-  async function api(path, body){
+  async function api(path, body){ return apiCall(path, body, true); }
+  async function apiCall(path, body, allowRetry){
     var opt = { method: body ? 'POST':'GET', credentials:'same-origin', headers:{} };
-    if (body){ opt.headers['Content-Type']='application/json'; opt.body=JSON.stringify(body); }
+    if (body){ opt.headers['Content-Type']='application/json'; if (S.csrf) opt.headers['X-CSRF-Token']=S.csrf; opt.body=JSON.stringify(body); }
     var res, data;
     try { res = await fetch('api/'+path, opt); } catch(e){ return {status:0, data:{error:'sin conexión con el servidor'}}; }
     try { data = await res.json(); } catch(e){ data = {error:'respuesta no válida'}; }
+    if (data && data.csrf) S.csrf = data.csrf;   // el servidor entrega/renueva el token (p.ej. en session.php)
+    // Reintento único si el token CSRF caducó (tras logout/regeneración de sesión).
+    if (res && res.status===403 && data && data.error==='csrf' && allowRetry && body){
+      try { var s=await fetch('api/session.php',{credentials:'same-origin'}); var sd=await s.json(); if (sd && sd.csrf) S.csrf=sd.csrf; } catch(e){}
+      return apiCall(path, body, false);
+    }
     return { status: res.status, data: data || {} };
   }
   function toast(msg){ var t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(function(){t.remove();},2800); }
@@ -369,23 +376,25 @@
 
   /* ---- Clientes (CRUD) ---- */
   function viewClientes(){
+    var admin = isAdmin();
     var rows = S.clients.map(function(c){
       return '<div class="cli-row">'+
         '<div class="cli-name"><b data-ficha="'+c.id+'">'+esc(c.nombre)+'</b><span class="cli-sector">'+esc(c.sector||'—')+(c.ddi?' · DDI '+esc(c.ddi):'')+(c.tenant?' · tenant '+esc(c.tenant):'')+'</span></div>'+
         '<div class="cli-plan hide-sm">'+esc(c.plan||'—')+'</div>'+
         '<div class="r cli-mins hide-sm">'+c.minutos_contratados+' min</div>'+
         '<div class="r cli-pct" style="color:'+(c.porcentaje>=100?'var(--c-danger)':c.porcentaje>=75?'var(--c-warn)':'var(--c-ok)')+'">'+c.porcentaje+'%</div>'+
-        '<div class="r cli-actions"><button class="icon-btn" data-edit="'+c.id+'" title="Editar">✎</button>'+
-        '<button class="icon-btn danger" data-del="'+c.id+'" title="Eliminar">🗑</button></div></div>';
+        '<div class="r cli-actions">'+(admin
+          ? '<button class="icon-btn" data-edit="'+c.id+'" title="Editar">✎</button><button class="icon-btn danger" data-del="'+c.id+'" title="Eliminar">🗑</button>'
+          : '')+'</div></div>';
     }).join('');
     return '<div class="card view-enter"><div class="panel-head"><div><h2 class="ph-title">Clientes</h2>'+
-      '<p class="ph-sub">Alta, edición y baja · datos guardados en el servidor</p></div>'+
-      '<button class="btn btn-primary" id="add-cli">+ Añadir cliente</button></div>'+
+      '<p class="ph-sub">'+(admin?'Alta, edición y baja · datos guardados en el servidor':'Solo lectura · contacta con un administrador para cambios')+'</p></div>'+
+      (admin?'<button class="btn btn-primary" id="add-cli">+ Añadir cliente</button>':'')+'</div>'+
       '<div class="cli-table"><div class="cli-head"><span>Cliente</span><span class="hide-sm">Plan</span><span class="r hide-sm">Contratados</span><span class="r">Uso</span><span class="r">Acciones</span></div>'+
-      (S.clients.length?rows:'<div class="cli-empty">No hay clientes. Pulsa «Añadir cliente».</div>')+'</div></div>';
+      (S.clients.length?rows:('<div class="cli-empty">No hay clientes'+(admin?'. Pulsa «Añadir cliente».':'.')+'</div>'))+'</div></div>';
   }
   function bindClientes(){
-    document.getElementById('add-cli').addEventListener('click', function(){ openClientForm(null); });
+    var addBtn=document.getElementById('add-cli'); if(addBtn) addBtn.addEventListener('click', function(){ openClientForm(null); });
     app.querySelectorAll('[data-edit]').forEach(function(b){ b.addEventListener('click', function(){ openClientForm(findClient(+b.dataset.edit)); }); });
     app.querySelectorAll('[data-del]').forEach(function(b){ b.addEventListener('click', async function(){
       var c=findClient(+b.dataset.del); if(!c) return;
@@ -480,16 +489,18 @@
         '<div class="agent-name">'+esc(a.nombre)+(cut?' <span class="cut-tag"><span class="sd"></span>Cortado</span>':'')+'</div>'+
         '<div class="agent-sub">DDI '+esc(a.ddi||'—')+(a.dial_number?' · dial '+esc(a.dial_number):'')+' · corte: '+esc(a.ivr_corte||'(por defecto)')+'</div></div></div>'+
         '<div class="agent-end"><span class="agent-minutes">'+(a.minutos||0)+'<span class="unit">min</span></span>'+divBtn+
-        '<button class="icon-btn danger" data-delag="'+a.id+'" title="Quitar agente">🗑</button></div></div>';
-    }).join('') : '<div class="muted" style="padding:6px 0">Sin agentes. Pulsa «Leer agentes» o «Agregar agente».</div>';
+        (admin?'<button class="icon-btn danger" data-delag="'+a.id+'" title="Quitar agente">🗑</button>':'')+'</div></div>';
+    }).join('') : '<div class="muted" style="padding:6px 0">Sin agentes'+(admin?'. Pulsa «Leer agentes» o «Agregar agente».':'.')+'</div>';
     box.innerHTML = '<div class="ma-title">Agentes IA · consumo del periodo</div>'+rows+
-      '<div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">'+
-      (admin?'<button class="btn btn-ghost btn-sm" id="ag-meter">↻ Actualizar consumo</button>':'')+
-      '<button class="btn btn-ghost btn-sm" id="ag-read">Leer agentes</button>'+
-      '<button class="btn btn-primary btn-sm" id="ag-add">+ Agregar agente</button></div>'+
-      '<div class="muted" style="margin-top:8px">«Leer agentes» trae los de DID público; el resto se añaden a mano con su dial number. «Actualizar consumo» recalcula los minutos desde el CDR (puede tardar unos segundos).</div>';
-    document.getElementById('ag-add').addEventListener('click', function(){ openAgentForm(c.id); });
-    document.getElementById('ag-read').addEventListener('click', function(){ readAgents(c.id); });
+      (admin
+        ? '<div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">'+
+          '<button class="btn btn-ghost btn-sm" id="ag-meter">↻ Actualizar consumo</button>'+
+          '<button class="btn btn-ghost btn-sm" id="ag-read">Leer agentes</button>'+
+          '<button class="btn btn-primary btn-sm" id="ag-add">+ Agregar agente</button></div>'+
+          '<div class="muted" style="margin-top:8px">«Leer agentes» trae los de DID público; el resto se añaden a mano con su dial number. «Actualizar consumo» recalcula los minutos desde el CDR (puede tardar unos segundos).</div>'
+        : '');
+    var addB=document.getElementById('ag-add'); if(addB) addB.addEventListener('click', function(){ openAgentForm(c.id); });
+    var readB=document.getElementById('ag-read'); if(readB) readB.addEventListener('click', function(){ readAgents(c.id); });
     var meterBtn=document.getElementById('ag-meter'); if(meterBtn) meterBtn.addEventListener('click', function(){ refreshConsumo(c.id); });
     box.querySelectorAll('[data-guide]').forEach(function(b){ b.addEventListener('click', function(){
       var ag=ags.filter(function(x){ return String(x.id)===b.dataset.guide; })[0]; if(ag) openCorteGuide(ag, c);
@@ -664,15 +675,15 @@
   }
   function bindMail(){
     var sel=document.getElementById('mail-cli'); if(!sel) return;
-    function render(){ var c=findClient(+sel.value); if(!c) return; var m=buildEmail(c);
+    function render(){ var c=findClient(+sel.value); if(!c) return; var m=buildEmail(c); var admin=isAdmin(); var ro=admin?'':' readonly';
       document.getElementById('mail-body').innerHTML=
-        '<div class="field"><label>Para</label><input class="field-input" id="mail-to" value="'+esc(c.correo||'')+'" placeholder="correo del destinatario"></div>'+
-        '<div class="field"><label>Asunto</label><input class="field-input" id="mail-subject" value="'+esc(m.asunto)+'"></div>'+
-        '<div class="field"><label>Mensaje</label><textarea class="field-input" id="mail-msg" style="min-height:200px">'+esc(m.cuerpo)+'</textarea></div>'+
+        '<div class="field"><label>Para</label><input class="field-input" id="mail-to" value="'+esc(c.correo||'')+'" placeholder="correo del destinatario"'+ro+'></div>'+
+        '<div class="field"><label>Asunto</label><input class="field-input" id="mail-subject" value="'+esc(m.asunto)+'"'+ro+'></div>'+
+        '<div class="field"><label>Mensaje</label><textarea class="field-input" id="mail-msg" style="min-height:200px"'+ro+'>'+esc(m.cuerpo)+'</textarea></div>'+
         '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px">'+
-        '<span class="muted">Se envía desde Conexia (con el logo) y con copia a SAC.</span>'+
-        '<button class="btn btn-primary" id="mail-send">✉ Enviar correo</button></div>';
-      document.getElementById('mail-send').addEventListener('click', sendMail);
+        '<span class="muted">'+(admin?'Se envía desde Conexia (con el logo) y con copia a SAC.':'Solo un administrador puede enviar correos.')+'</span>'+
+        (admin?'<button class="btn btn-primary" id="mail-send">✉ Enviar correo</button>':'')+'</div>';
+      var sendBtn=document.getElementById('mail-send'); if(sendBtn) sendBtn.addEventListener('click', sendMail);
     }
     sel.addEventListener('change', render); render();
   }

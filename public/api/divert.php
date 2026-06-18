@@ -8,7 +8,7 @@ require __DIR__ . '/_bootstrap.php';
 require __DIR__ . '/lib/pbx.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') json_out(['error' => 'method_not_allowed'], 405);
-$u = require_auth();
+$u = require_admin();   // cortar/reactivar el DID es acción telefónica en producción: solo admin
 
 $in      = body_json();
 $agentId = (int)($in['agent_id'] ?? 0);

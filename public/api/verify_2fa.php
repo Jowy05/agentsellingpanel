@@ -7,6 +7,7 @@ require __DIR__ . '/lib/totp.php';
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_out(['error' => 'Método no permitido'], 405);
 }
+require_csrf();   // anti-CSRF: exige Content-Type JSON + X-CSRF-Token de la sesión
 
 // Debe existir un login pendiente (paso 1 superado con password correcta).
 $pendingUid = $_SESSION['pending_uid'] ?? null;

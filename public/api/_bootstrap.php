@@ -61,7 +61,7 @@ function security_headers(): void {
   if ($o && (($_SERVER['HTTP_ORIGIN'] ?? '') === $o)) {
     header("Access-Control-Allow-Origin: $o");
     header('Access-Control-Allow-Credentials: true');
-    header('Access-Control-Allow-Headers: Content-Type');
+    header('Access-Control-Allow-Headers: Content-Type, X-CSRF-Token');
     header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
   }
 }
@@ -74,6 +74,9 @@ function start_session(): void {
     'lifetime' => 0, 'path' => '/', 'secure' => $secure, 'httponly' => true, 'samesite' => 'Strict',
   ]);
   session_start();
+  // Token anti-CSRF por sesión (sincronizador). Se entrega al SPA vía session.php y
+  // se exige en cabecera X-CSRF-Token para todo POST con efectos (ver require_csrf()).
+  if (empty($_SESSION['csrf'])) { $_SESSION['csrf'] = bin2hex(random_bytes(32)); }
 }
 
 function json_out($data, int $code = 200): void {
@@ -87,7 +90,25 @@ function body_json(): array {
   return is_array($j) ? $j : [];
 }
 
+// Token CSRF de la sesión (se devuelve al SPA en session.php).
+function csrf_token(): string { return (string)($_SESSION['csrf'] ?? ''); }
+
+// Protección CSRF para peticiones POST con efectos:
+//  - exige Content-Type application/json (un <form> cross-site no puede fijarlo sin preflight CORS),
+//  - exige la cabecera X-CSRF-Token igual al token de la sesión (comparación en tiempo constante).
+// No hace nada en GET/OPTIONS. Se invoca desde require_auth() y, en los endpoints previos al login
+// (login/verify_2fa/setup_2fa/logout), de forma explícita.
+function require_csrf(): void {
+  if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') return;
+  $ct = strtolower((string)($_SERVER['CONTENT_TYPE'] ?? ''));
+  if (strpos($ct, 'application/json') === false) json_out(['error' => 'bad_content_type'], 415);
+  $sent = (string)($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+  $sess = (string)($_SESSION['csrf'] ?? '');
+  if ($sess === '' || !hash_equals($sess, $sent)) json_out(['error' => 'csrf'], 403);
+}
+
 function require_auth(bool $require2fa = true): array {
+  require_csrf();
   if (empty($_SESSION['uid'])) json_out(['error' => 'no_auth'], 401);
   if ($require2fa && empty($_SESSION['twofa_ok'])) json_out(['error' => '2fa_required'], 401);
   $uid = (int)$_SESSION['uid'];

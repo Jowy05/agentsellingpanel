@@ -23,6 +23,12 @@ $auth = require_auth(true);
 $in     = body_json();
 $action = isset($in['action']) ? (string)$in['action'] : '';
 
+// Separación de privilegios: escribir clientes (alta/edición/baja, incl. minutos y estado de corte)
+// es exclusivo de admin. El rol técnico tiene acceso de SOLO LECTURA (list/get).
+if (in_array($action, ['create', 'update', 'delete'], true) && ($auth['rol'] ?? '') !== 'admin') {
+    json_out(['error' => 'forbidden', 'detalle' => 'Esta acción requiere rol administrador.'], 403);
+}
+
 // Longitud máxima del slug en BD (clientes.slug VARCHAR(120)).
 const SLUG_MAX = 120;
 
