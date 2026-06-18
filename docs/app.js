@@ -207,7 +207,8 @@
       { n:'1', t:'Acceso (login + 2FA)', body:
         '<ol><li>Entra con tu <b>correo</b> y <b>contraseña</b>.</li>'+
         '<li>La <b>primera vez</b>: escanea el <b>QR</b> con Google Authenticator y guarda los códigos de recuperación.</li>'+
-        '<li>En cada acceso, mete el <b>código de 6 dígitos</b> de la app (caduca cada 30 s).</li></ol>' },
+        '<li>En cada acceso, mete el <b>código de 6 dígitos</b> de la app (caduca cada 30 s).</li>'+
+        '<li>Para <b>cambiar tu contraseña</b>: pulsa el <b>🔑</b> junto a tu nombre (arriba a la derecha).</li></ol>' },
       { n:'2', t:'Clientes (alta y edición)', body:
         '<ol><li>Pestaña <b>Clientes</b> → <b>+ Añadir cliente</b>.</li>'+
         '<li>Pon nombre, <b>Tenant</b> (el <b>código</b>, p.ej. <code>216</code>), <b>minutos contratados</b> (total del cliente) e <b>IVR de corte por defecto</b>.</li>'+
@@ -221,17 +222,19 @@
       { n:'4', t:'Consumo y Stats', body:
         '<ol><li>Pestaña <b>Stats</b>: un <b>círculo por cliente</b> con el % usado (verde &lt;75, ámbar 75-99, rojo 100) y «usado / contratado».</li>'+
         '<li><b>Clic en un cliente</b> → abre su ficha.</li>'+
-        '<li><b>Actualizar consumo</b> recalcula desde el CDR de la centralita. El panel además se <b>actualiza solo</b>.</li></ol>',
+        '<li><b>Actualizar consumo</b> recalcula desde el CDR de la centralita. El panel además se <b>actualiza solo</b>.</li>'+
+        '<li>El <b>día 1 de cada mes</b> el consumo vuelve a <b>0</b> automáticamente (los meses anteriores quedan como histórico).</li></ol>',
         demo: '<div class="donut-grid" style="padding:0;grid-template-columns:repeat(2,1fr);gap:12px">'+donutMini(36,'Sonrisa','180 / 500 min')+donutMini(100,'conexia','500 / 500 min')+'</div>' },
-      { n:'5', t:'Avisos por email', body:
-        '<ol><li>Al llegar al <b>75%</b> y al <b>100%</b>, el cliente recibe un <b>correo</b> automático (con copia a SAC).</li>'+
-        '<li>Se manda <b>una vez</b> por umbral; si amplías minutos y baja del 75%, se vuelve a avisar al cruzarlo.</li>'+
-        '<li>La <b>campana</b> de arriba parpadea cuando hay clientes en aviso; púlsala para marcarlo leído.</li></ol>',
-        demo: '<div style="display:flex;align-items:center;gap:12px"><span class="notif-btn has-alert warn" style="position:relative">'+BELL_SVG+'<span class="notif-badge warn show">1</span></span><span class="muted">Aviso de consumo activo</span></div>' },
+      { n:'5', t:'Avisos (campana y correos)', body:
+        '<ol><li>La <b>campana</b> de arriba («Avisos») tiene <b>dos secciones</b>: <b>Consumo</b> y <b>Agentes desactivados</b>.</li>'+
+        '<li><b>Consumo:</b> al <b>75%</b> y <b>100%</b> el cliente recibe un <b>correo</b> automático (copia a SAC); se manda una vez por umbral y se rearma si baja del 75%. Estos avisos <b>se quitan solos</b> al bajar el consumo.</li>'+
+        '<li><b>Agentes desactivados:</b> cada agente cortado aparece aquí y <b>no se quita</b> hasta que un admin pulsa <b>«✅ Reactivado»</b>.</li></ol>',
+        demo: '<div class="notif-dropdown" style="position:static;width:auto;box-shadow:none;border-radius:10px"><div class="nd-head">Avisos</div><div class="nd-sub">Consumo</div><div class="notif-item"><span><b>Inmobiliaria Vista</b> · 100%</span><span class="state-badge cortado"><span class="sd"></span>100%</span></div><div class="nd-sub">Agentes desactivados</div><div class="notif-item"><span><b>Agente Vista</b> · Inmobiliaria <span class="cut-tag"><span class="sd"></span>Desviado</span></span></div></div>' },
       { n:'6', t:'Corte automático y reactivación', body:
         '<ol><li>Al <b>100%</b>, el agente se <b>corta solo</b>: su DID se desvía al IVR de corte (deja de atender).</li>'+
         '<li>La <b>reactivación es manual</b> en la centralita: el botón <b>«Cómo reactivar»</b> te da el enlace directo al DID (Destination → AI Voice Agents → el agente).</li>'+
-        '<li>Cuando lo hayas hecho, pulsa <b>«✅ Marcar reactivado»</b> para ponerlo activo en el panel.</li></ol>',
+        '<li>Cuando lo hayas hecho, pulsa <b>«✅ Marcar reactivado»</b> para ponerlo activo en el panel.</li>'+
+        '<li>El agente cortado también queda en la <b>campana</b> (Avisos → Agentes desactivados) hasta reactivarlo.</li></ol>',
         demo: '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="cut-tag"><span class="sd"></span>Cortado</span><button class="btn btn-ghost btn-sm" type="button">Cómo reactivar</button><button class="btn btn-primary btn-sm" type="button">✅ Marcar reactivado</button></div>' },
       { n:'7', t:'Equipo (solo admin)', body:
         '<ol><li>Pestaña <b>Equipo</b>: crea miembros del equipo técnico.</li>'+
@@ -245,7 +248,7 @@
     var html='<div class="modal-scrim" id="scrimguide"><div class="modal guide-modal"><div class="modal-head"><div>'+
       '<h3 class="mh-name">Guía de uso del panel</h3><div class="mh-meta">Cómo funciona cada parte</div></div>'+
       '<button class="x-close" id="xguide">✕</button></div>'+
-      '<div class="modal-body guide-body"><p class="guide-intro">Panel para revender el Agente de Voz IA por minutos. Estas son las partes y cómo se usan:</p>'+
+      '<div class="modal-body guide-body"><p class="guide-intro">Panel para revender el Agente de Voz IA por minutos. <b>Roles:</b> el <b>administrador</b> da de alta y edita clientes/agentes, corta/reactiva y envía correos; el <b>técnico</b> lo consulta todo y cambia su contraseña (los cambios los realiza un administrador). Estas son las partes y cómo se usan:</p>'+
       '<div class="guide-toc">'+toc+'</div>'+body+'</div></div></div>';
     var wrap=document.createElement('div'); wrap.innerHTML=html; document.body.appendChild(wrap.firstChild);
     var scrim=document.getElementById('scrimguide');
