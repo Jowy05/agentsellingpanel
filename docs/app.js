@@ -292,7 +292,7 @@
     // Agentes desviados (cortados): persisten hasta que se marca la reactivación.
     var cuts = [];
     S.clients.forEach(function(c){
-      (c.agentes_cortados||[]).forEach(function(a){ cuts.push({ agentId:a.id, agente:a.nombre||'Agente', cliente:c.nombre }); });
+      (c.agentes_cortados||[]).forEach(function(a){ cuts.push({ agentId:a.id, agente:a.nombre||'Agente', cliente:c.nombre, clienteId:c.id, ddi:a.ddi||'' }); });
     });
     var level = (list.some(function(x){ return x.level==='danger'; }) || cuts.length) ? 'danger' : (list.length ? 'warn' : null);
     var parts = list.map(function(x){ return x.nombre+':'+x.level; }).concat(cuts.map(function(x){ return 'cut'+x.agentId; }));
@@ -338,8 +338,12 @@
     // Sección 2: agentes desviados. PERSISTEN hasta marcar reactivado (no se quitan solos).
     var admin = isAdmin();
     var cortes = a.cuts.length ? a.cuts.map(function(x){
-      var btn = admin ? '<button class="btn btn-primary btn-sm" data-react-bell="'+x.agentId+'" data-nom="'+esc(x.agente)+'" title="Lo he reactivado en la centralita">✅ Reactivado</button>' : '';
-      return '<div class="notif-item"><span><b>'+esc(x.agente)+'</b> · '+esc(x.cliente)+' <span class="cut-tag"><span class="sd"></span>Desviado</span></span>'+btn+'</div>';
+      var btns = admin
+        ? '<div style="display:flex;gap:6px;flex-wrap:wrap;width:100%;justify-content:flex-end;margin-top:6px">'
+          + '<button class="btn btn-ghost btn-sm" data-guide-bell="'+x.agentId+'" title="Genera el enlace directo al DID en la centralita">🔗 Cómo reactivar</button>'
+          + '<button class="btn btn-primary btn-sm" data-react-bell="'+x.agentId+'" data-nom="'+esc(x.agente)+'" title="Ya lo he reactivado en la centralita">✅ Reactivado</button></div>'
+        : '';
+      return '<div class="notif-item"><span><b>'+esc(x.agente)+'</b> · '+esc(x.cliente)+' <span class="cut-tag"><span class="sd"></span>Desviado</span></span>'+btns+'</div>';
     }).join('') : '<div class="notif-empty">Ningún agente desviado.</div>';
     var dd = document.createElement('div'); dd.className = 'notif-dropdown';
     dd.innerHTML = '<div class="nd-head">Avisos</div>'
@@ -348,6 +352,12 @@
     wrap.appendChild(dd);
     dd.querySelectorAll('[data-react-bell]').forEach(function(b){
       b.addEventListener('click', function(e){ e.stopPropagation(); doReactivadoFromBell(+b.dataset.reactBell, b.dataset.nom); });
+    });
+    dd.querySelectorAll('[data-guide-bell]').forEach(function(b){
+      b.addEventListener('click', function(e){ e.stopPropagation();
+        var x=a.cuts.filter(function(z){ return String(z.agentId)===b.dataset.guideBell; })[0]; if(!x) return;
+        openCorteGuide({ id:x.agentId, nombre:x.agente, ddi:x.ddi }, findClient(x.clienteId)||{ id:x.clienteId, desvio_100:'' });
+      });
     });
     ackAlerts(a.sig);   // abrir el panel = marcar como leído -> deja de parpadear (los desviados siguen listados)
     updateAlerts();
