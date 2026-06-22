@@ -4,7 +4,14 @@
   var app = document.getElementById('app');
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
-  var S = { user:null, clients:[], periodo:'', view:'clientes' };
+  var S = { user:null, clients:[], periodo:'', view:'stats', mdSel:null, mdFilter:'todos' };
+  function initials(n){ var p=(n||'').trim().split(/\s+/); return (((p[0]||'?')[0]||'?')+(p[1]?p[1][0]:'')).toUpperCase(); }
+  function isDark(){ return document.documentElement.getAttribute('data-theme')==='dark'; }
+  function applyTheme(t){ if(t==='dark') document.documentElement.setAttribute('data-theme','dark'); else document.documentElement.removeAttribute('data-theme'); try{localStorage.setItem('cx_theme',t);}catch(e){} }
+  function toggleTheme(){ applyTheme(isDark()?'light':'dark'); var b=document.getElementById('theme'); if(b) b.textContent=isDark()?'☀':'☾'; }
+  try{ applyTheme(localStorage.getItem('cx_theme')||'light'); }catch(e){}
+  function stk(p){ return p>=100?'cortado':p>=75?'aviso':'ok'; }
+  function stCol(p){ return 'var(--c-'+(p>=100?'danger':p>=75?'warn':'ok')+')'; }
   var ACK_KEY = 'cx_alerts_ack';
   var DOC_TITLE = 'Panel Agentes Voz IA — Conexia';
   var BELL_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20a2 2 0 0 0 4 0"/></svg>';
@@ -179,20 +186,27 @@
     var views=[['clientes','Clientes'],['stats','Stats'],['mail','Avisos']];
     if (isAdmin()) views.push(['equipo','Equipo']);
     app.innerHTML =
+      '<header class="appbar"><div class="appbar-inner">'+
+        '<div class="brand"><div class="logo"></div><div class="divider"></div>'+
+          '<div class="titles"><h1>Panel Agentes Voz IA</h1></div></div>'+
+        '<div class="appbar-right">'+
+          '<span class="userchip" id="userchip" title="Cambiar contraseña"><span class="uc-meta"><span class="uc-name">'+esc(S.user.nombre)+'</span><span class="uc-rol">'+esc(S.user.rol)+'</span></span><span class="avatar">'+esc(initials(S.user.nombre))+'</span></span>'+
+          '<button class="icon-pill" id="key" title="Cambiar contraseña">🔑</button>'+
+          '<div class="notif-wrap"><button class="notif-btn" id="notif" title="Avisos" aria-label="Avisos">'+BELL_SVG+'<span class="notif-badge" id="notif-badge"></span></button></div>'+
+          '<button class="theme-toggle" id="theme" title="Tema claro / oscuro">'+(isDark()?'☀':'☾')+'</button>'+
+          '<button class="icon-pill salir" id="logout" title="Cerrar sesión">⎋ Salir</button>'+
+        '</div>'+
+      '</div></header>'+
       '<div class="app">'+
-      '<div class="topbar"><div class="brand"><div class="logo"></div><div class="divider"></div>'+
-        '<div class="titles"><div class="kicker">Conexia</div><h1 id="app-name">Panel Agentes Voz IA</h1></div></div>'+
-        '<div class="topbar-right"><span class="userchip" id="userchip" title="Cambiar contraseña" style="cursor:pointer">'+esc(S.user.nombre)+' · '+esc(S.user.rol)+' 🔑</span>'+
-        '<div class="notif-wrap"><button class="notif-btn" id="notif" title="Notificaciones" aria-label="Notificaciones">'+BELL_SVG+'<span class="notif-badge" id="notif-badge"></span></button></div>'+
-        '<button class="theme-toggle" id="logout">Salir</button></div></div>'+
       '<div class="nav"><div class="nav-segmented">'+views.map(function(v){return '<button class="seg'+(v[0]===S.view?' active':'')+'" data-v="'+v[0]+'">'+v[1]+'</button>';}).join('')+'</div></div>'+
-      '<div id="view"></div>'+
-      '<button class="help-fab" id="help-fab" title="Guía de uso" aria-label="Guía de uso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>'+
-      '</div>';
+      '<div id="view"></div></div>'+
+      '<button class="help-fab" id="help-fab" title="Guía de uso" aria-label="Guía de uso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>';
     document.getElementById('logout').addEventListener('click', async function(){ stopAuto(); await api('logout.php',{}); renderLogin(); });
     document.getElementById('notif').addEventListener('click', function(e){ e.stopPropagation(); toggleNotif(); });
     document.getElementById('help-fab').addEventListener('click', openGuide);
     document.getElementById('userchip').addEventListener('click', openChangePass);
+    document.getElementById('key').addEventListener('click', openChangePass);
+    document.getElementById('theme').addEventListener('click', toggleTheme);
     app.querySelectorAll('.seg').forEach(function(b){ b.addEventListener('click', function(){ S.view=b.dataset.v; renderView(); }); });
     renderView();
     startAuto();
@@ -639,32 +653,63 @@
       '<circle cx="'+(sz/2)+'" cy="'+(sz/2)+'" r="'+r+'" fill="none" stroke="'+col+'" stroke-width="'+sw+'" stroke-linecap="round" stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'"/></g>'+
       '<text x="'+(sz/2)+'" y="'+(sz/2)+'" text-anchor="middle" dominant-baseline="central" style="font-family:var(--font-display);font-weight:700;font-size:21px;fill:'+col+'">'+pct+'%</text></svg>';
   }
+  function donutBig(pct){
+    var sz=140, sw=16, r=(sz-sw)/2, c=2*Math.PI*r, p=Math.max(0,Math.min(100,pct)), off=c*(1-p/100), col=stCol(pct);
+    return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 '+sz+' '+sz+'" style="flex:none">'+
+      '<g transform="rotate(-90 '+(sz/2)+' '+(sz/2)+')">'+
+      '<circle cx="'+(sz/2)+'" cy="'+(sz/2)+'" r="'+r+'" fill="none" stroke="var(--track)" stroke-width="'+sw+'"/>'+
+      '<circle cx="'+(sz/2)+'" cy="'+(sz/2)+'" r="'+r+'" fill="none" stroke="'+col+'" stroke-width="'+sw+'" stroke-linecap="round" stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'"/></g>'+
+      '<text x="'+(sz/2)+'" y="'+(sz/2)+'" text-anchor="middle" dominant-baseline="central" style="font-family:var(--font-display);font-weight:700;font-size:30px;fill:'+col+'">'+pct+'%</text></svg>';
+  }
+  function mdClients(){
+    var l=S.clients.slice().sort(function(a,b){return b.porcentaje-a.porcentaje;});
+    if(S.mdFilter==='aviso') l=l.filter(function(c){return c.porcentaje>=75&&c.porcentaje<100;});
+    else if(S.mdFilter==='cortados') l=l.filter(function(c){return c.porcentaje>=100;});
+    return l;
+  }
   function viewStats(){
-    var n=S.clients.length;
-    var totC=S.clients.reduce(function(s,c){return s+c.minutos_contratados;},0);
-    var totU=S.clients.reduce(function(s,c){return s+c.minutos_usados;},0);
-    var avg= totC? Math.round(totU/totC*100):0;
-    var aviso=S.clients.filter(function(c){return c.porcentaje>=75 && c.porcentaje<100;}).length;
-    var cort=S.clients.filter(function(c){return c.porcentaje>=100;}).length;
-    var cards = S.clients.slice().sort(function(a,b){return b.porcentaje-a.porcentaje;}).map(function(c){
-      return '<div class="donut-card" data-ficha="'+c.id+'">'+donutSVG(c.porcentaje)+
-        '<div class="dc-name">'+esc(c.nombre)+'</div>'+
-        '<div class="dc-mins">'+c.minutos_usados+' / '+c.minutos_contratados+' min</div>'+
-        '<div style="margin-top:9px">'+estadoBadge(c.porcentaje)+'</div></div>';
+    var admin=isAdmin(), list=mdClients();
+    if((S.mdSel==null || !findClient(S.mdSel)) && list.length) S.mdSel=list[0].id;
+    var items=list.map(function(c){ var k=stk(c.porcentaje);
+      return '<button class="md-item'+(c.id===S.mdSel?' sel':'')+'" data-sel="'+c.id+'">'+
+        '<div class="md-ava '+k+'">'+esc(initials(c.nombre).slice(0,1))+'</div>'+
+        '<div class="md-mid"><div class="md-row1"><span class="md-nm">'+esc(c.nombre)+'</span>'+
+        '<span class="md-pct" style="color:'+stCol(c.porcentaje)+'">'+c.porcentaje+'%</span></div>'+
+        '<div class="bar '+k+'"><span style="width:'+Math.min(100,c.porcentaje)+'%"></span></div></div></button>';
     }).join('');
-    return '<div class="kpi-row">'+
-      '<div class="kpi"><div class="k">Clientes</div><div class="v">'+n+'</div><div class="f">cartera</div></div>'+
-      '<div class="kpi"><div class="k">Consumo medio</div><div class="v">'+avg+'<small>%</small></div><div class="f">'+totU+' / '+totC+' min</div></div>'+
-      '<div class="kpi"><div class="k">En aviso</div><div class="v">'+aviso+'</div><div class="f">75–99%</div></div>'+
-      '<div class="kpi"><div class="k">Cortados</div><div class="v">'+cort+'</div><div class="f">100% · desvío</div></div></div>'+
-      '<div class="card"><div class="panel-head"><div><h2 class="ph-title">Consumo por cliente</h2><p class="ph-sub">Periodo '+esc(S.periodo)+' · clic en un cliente para ver su ficha</p></div>'+
-      (isAdmin()?'<button class="btn btn-primary" id="refresh-cdr">↻ Actualizar consumo</button>':'')+'</div>'+
-      (S.clients.length ? '<div class="donut-grid">'+cards+'</div>' : '<div class="cli-empty">No hay clientes.</div>')+'</div>';
+    var filt=[['todos','Todos'],['aviso','En aviso'],['cortados','Cortados']].map(function(f){
+      return '<button class="md-filter'+(S.mdFilter===f[0]?' active':'')+'" data-filt="'+f[0]+'">'+f[1]+'</button>';
+    }).join('');
+    return '<div class="view-head"><div><h1 class="vh-title">¿Cómo van tus clientes?</h1>'+
+      '<p class="vh-sub">Elige un cliente de la lista para ver su ficha y sus agentes</p></div>'+
+      (admin?'<button class="btn btn-primary" id="refresh-cdr">↻ Actualizar consumo</button>':'')+'</div>'+
+      '<div class="md"><div class="md-list"><div class="md-list-head"><span class="t">Clientes</span><span class="md-count">'+S.clients.length+'</span></div>'+
+      '<div class="md-filters">'+filt+'</div>'+
+      '<div class="md-scroll">'+(list.length?items:'<div class="md-empty" style="min-height:120px">Sin clientes en este filtro.</div>')+'</div></div>'+
+      '<div class="md-detail" id="md-detail"></div></div>';
+  }
+  function renderFichaDetail(){
+    var box=document.getElementById('md-detail'); if(!box) return;
+    var c=findClient(S.mdSel);
+    if(!c){ box.innerHTML='<div class="md-empty">Elige un cliente de la lista para ver su ficha.</div>'; return; }
+    var pct=c.porcentaje, col=stCol(pct);
+    box.innerHTML=
+      '<div class="fd-top">'+donutBig(pct)+
+      '<div class="fd-head"><h2>'+esc(c.nombre)+'</h2><div class="sub">'+esc(c.sector||'—')+' · '+esc(c.plan||'—')+'</div>'+
+      '<div class="fd-fig"><span class="fd-used" style="color:'+col+'">'+c.minutos_usados+'</span><span class="fd-of">/ '+c.minutos_contratados+' min · usados / contratados</span></div>'+
+      '<div style="margin-top:8px">'+estadoBadge(pct)+'</div></div></div>'+
+      '<div class="kv-grid">'+
+      '<div class="kv"><div class="k">Correo</div><div class="v" style="font-family:var(--font-mono);font-size:13px">'+esc(c.correo||'—')+'</div></div>'+
+      '<div class="kv"><div class="k">Tenant</div><div class="v" style="font-family:var(--font-mono)">'+esc(c.tenant||'—')+'</div></div>'+
+      '<div class="kv"><div class="k">IVR de corte</div><div class="v" style="font-size:13px">'+esc(c.desvio_100||'—')+'</div></div>'+
+      '<div class="kv"><div class="k">Minutos restantes</div><div class="v">'+Math.max(0,c.minutos_contratados-c.minutos_usados)+' min</div></div></div>'+
+      '<div class="modal-agents" id="ficha-agents"><div class="ma-title">Agentes IA</div><div class="muted" style="padding:6px 0">Cargando…</div></div>';
+    loadFichaAgents(c);
   }
   function bindStats(){
-    document.querySelectorAll('.donut-card[data-ficha]').forEach(function(el){
-      el.addEventListener('click', function(){ var c=findClient(+el.dataset.ficha); if(c) openFicha(c); });
-    });
+    document.querySelectorAll('.md-item[data-sel]').forEach(function(b){ b.addEventListener('click', function(){ S.mdSel=+b.dataset.sel; renderView(); }); });
+    document.querySelectorAll('.md-filter[data-filt]').forEach(function(b){ b.addEventListener('click', function(){ S.mdFilter=b.dataset.filt; var l=mdClients(); S.mdSel=l.length?l[0].id:null; renderView(); }); });
+    renderFichaDetail();
   }
 
   /* ---- Avisos (mail) ---- */
