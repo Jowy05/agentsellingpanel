@@ -214,31 +214,37 @@
 
   /* ---- Guía de uso (botón flotante) ---- */
   function openGuide(){
-    function donutMini(pct, nombre, mins){
-      return '<div class="donut-card" style="cursor:default">'+donutSVG(pct)+'<div class="dc-name">'+nombre+'</div><div class="dc-mins">'+mins+'</div></div>';
-    }
     var secs = [
       { n:'1', t:'Acceso (login + 2FA)', body:
         '<ol><li>Entra con tu <b>correo</b> y <b>contraseña</b>.</li>'+
         '<li>La <b>primera vez</b>: escanea el <b>QR</b> con Google Authenticator y guarda los códigos de recuperación.</li>'+
         '<li>En cada acceso, mete el <b>código de 6 dígitos</b> de la app (caduca cada 30 s).</li>'+
-        '<li>Para <b>cambiar tu contraseña</b>: pulsa el <b>🔑</b> junto a tu nombre (arriba a la derecha).</li></ol>' },
+        '<li>Para <b>cambiar tu contraseña</b>: pulsa el <b>🔑</b> (o tu nombre) arriba a la derecha.</li>'+
+        '<li><b>Barra superior</b> (arriba a la derecha): tu <b>avatar con iniciales</b> con nombre y rol, <b>🔑</b> contraseña, <b>🔔 Avisos</b>, el <b>conmutador de tema</b> <b>☾/☀</b> (claro/oscuro, se recuerda en este navegador) y <b>⎋ Salir</b>.</li></ol>',
+        demo: '<div class="appbar-right" style="position:static;justify-content:flex-end"><span class="userchip"><span class="uc-meta"><span class="uc-name">Nuno</span><span class="uc-rol">admin</span></span><span class="avatar">N</span></span><button class="icon-pill" type="button">🔑</button><button class="icon-pill" type="button">🔔</button><button class="theme-toggle" type="button">☾</button><button class="icon-pill salir" type="button">⎋ Salir</button></div>' },
       { n:'2', t:'Clientes (alta y edición)', body:
         '<ol><li>Pestaña <b>Clientes</b> → <b>+ Añadir cliente</b>.</li>'+
         '<li>Pon nombre, <b>Tenant</b> (el <b>código</b>, p.ej. <code>216</code>), <b>minutos contratados</b> (total del cliente) e <b>IVR de corte por defecto</b>.</li>'+
         '<li>Con los iconos: <b>✎</b> editar, <b>🗑</b> eliminar.</li></ol>',
         demo: '<div class="cli-table"><div class="cli-row"><div class="cli-name"><b>Clínica Dental Sonrisa</b><span class="cli-sector">Salud · tenant 216</span></div><div class="cli-plan hide-sm">Plan 500</div><div class="r cli-mins hide-sm">500 min</div><div class="r cli-pct" style="color:var(--c-ok)">36%</div><div class="r cli-actions"><button class="icon-btn" type="button">✎</button><button class="icon-btn danger" type="button">🗑</button></div></div></div>' },
       { n:'3', t:'Ficha y agentes IA', body:
-        '<ol><li>Haz <b>clic en el nombre</b> del cliente para abrir su ficha.</li>'+
+        '<ol><li>Abre la ficha de un cliente: en <b>Stats</b> <b>elígelo en la lista</b> y aparece a la derecha; o en <b>Clientes</b> haz <b>clic en su nombre</b> (se abre en ventana).</li>'+
         '<li>En <b>Agentes IA</b>: <b>Leer agentes</b> detecta solos los que tienen DID; o <b>Agregar agente</b> a mano (nombre, dial number, DDI, IVR de corte).</li>'+
         '<li>Verás los <b>minutos por agente</b> del periodo.</li></ol>',
         demo: '<div class="agent-row"><div class="agent-meta"><div><div class="agent-name">INTELIGENCIA ARTIFICIAL SKYNET</div><div class="agent-sub">DDI 930905100 · corte: 114</div></div></div><div class="agent-end"><span class="agent-minutes">107<span class="unit">min</span></span></div></div>' },
-      { n:'4', t:'Consumo y Stats', body:
-        '<ol><li>Pestaña <b>Stats</b>: un <b>círculo por cliente</b> con el % usado (verde &lt;75, ámbar 75-99, rojo 100) y «usado / contratado».</li>'+
-        '<li><b>Clic en un cliente</b> → abre su ficha.</li>'+
-        '<li><b>Actualizar consumo</b> recalcula desde el CDR de la centralita. El panel además se <b>actualiza solo</b>.</li>'+
+      { n:'4', t:'Stats y consumo (inicio)', body:
+        '<ol><li><b>Stats</b> es la <b>pestaña de inicio</b>. A la <b>izquierda</b>, la <b>lista de clientes</b> (avatar, nombre, <b>barra de progreso</b> y % en color: verde &lt;75, ámbar 75-99, rojo 100), ordenada de más a menos consumo.</li>'+
+        '<li><b>Filtros</b> sobre la lista: <b>Todos</b>, <b>En aviso</b> (75-99%) y <b>Cortados</b> (100%).</li>'+
+        '<li>Al <b>elegir un cliente</b>, a la <b>derecha</b> se abre su <b>ficha</b>: <b>donut grande</b> con el %, minutos <b>usados / contratados</b>, estado, datos (correo, tenant, IVR de corte, minutos restantes) y sus <b>agentes IA</b>.</li>'+
+        '<li><b>Actualizar consumo</b> (solo admin) recalcula desde el CDR de la centralita. El panel además se <b>actualiza solo</b>.</li>'+
         '<li>El <b>día 1 de cada mes</b> el consumo vuelve a <b>0</b> automáticamente (los meses anteriores quedan como histórico).</li></ol>',
-        demo: '<div class="donut-grid" style="padding:0;grid-template-columns:repeat(2,1fr);gap:12px">'+donutMini(36,'Sonrisa','180 / 500 min')+donutMini(100,'conexia','500 / 500 min')+'</div>' },
+        demo: '<div style="display:grid;grid-template-columns:1.05fr .95fr;gap:14px;align-items:start">'+
+          '<div><div class="md-filters" style="padding:0 0 10px"><button class="md-filter active" type="button">Todos</button><button class="md-filter" type="button">En aviso</button><button class="md-filter" type="button">Cortados</button></div>'+
+          '<div class="md-item sel"><div class="md-ava cortado">I</div><div class="md-mid"><div class="md-row1"><span class="md-nm">Inmobiliaria Vista</span><span class="md-pct" style="color:var(--c-danger)">100%</span></div><div class="bar cortado"><span style="width:100%"></span></div></div></div>'+
+          '<div class="md-item"><div class="md-ava aviso">C</div><div class="md-mid"><div class="md-row1"><span class="md-nm">Clínica Sonrisa</span><span class="md-pct" style="color:var(--c-warn)">82%</span></div><div class="bar aviso"><span style="width:82%"></span></div></div></div>'+
+          '<div class="md-item"><div class="md-ava ok">A</div><div class="md-mid"><div class="md-row1"><span class="md-nm">Asesoría León</span><span class="md-pct" style="color:var(--c-ok)">41%</span></div><div class="bar ok"><span style="width:41%"></span></div></div></div></div>'+
+          '<div style="text-align:center;padding:6px">'+donutBig(100)+'<div style="font-family:var(--font-display);font-weight:700;margin-top:4px">Inmobiliaria Vista</div><div class="muted" style="font-size:12.5px">500 / 500 min · usados / contratados</div></div>'+
+          '</div>' },
       { n:'5', t:'Avisos (campana y correos)', body:
         '<ol><li>La <b>campana</b> de arriba («Avisos») tiene <b>dos secciones</b>: <b>Consumo</b> y <b>Agentes desactivados</b>.</li>'+
         '<li><b>Consumo:</b> al <b>75%</b> y <b>100%</b> el cliente recibe un <b>correo</b> automático (copia a SAC); se manda una vez por umbral y se rearma si baja del 75%. Estos avisos <b>se quitan solos</b> al bajar el consumo.</li>'+
